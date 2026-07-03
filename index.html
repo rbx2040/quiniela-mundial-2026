@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiniela Mundial 2026</title>
+<style>
+  :root{
+    --navy:#0a1a3a; --navy-2:#132a5c; --gold:#d4af37; --gold-light:#f3d97a;
+    --green:#0f3d24; --gray:#7a7a7a; --gray-bg:#e9e9e9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(160deg,var(--navy) 0%,#04102a 100%);
+    color:#fff; min-height:100vh; padding:16px;
+  }
+  .wrap{max-width:1000px;margin:0 auto;}
+  header{
+    text-align:center; padding:18px 10px; border:2px solid var(--gold);
+    border-radius:14px; background:linear-gradient(180deg,#0d234f,#081a3d);
+    margin-bottom:16px; box-shadow:0 0 20px rgba(212,175,55,.25);
+  }
+  header h1{margin:0 0 4px; color:var(--gold-light); font-size:1.6rem; letter-spacing:.5px;}
+  header p{margin:0; color:#c9d3e8; font-size:.85rem;}
+
+  .panel{
+    background:#0d234f; border:1px solid #24407a; border-radius:10px;
+    padding:12px 14px; margin-bottom:14px; font-size:.85rem;
+  }
+  .panel summary{cursor:pointer; color:var(--gold-light); font-weight:600; outline:none;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+  input[type=text], input[type=password], input[type=number]{
+    background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px;
+    padding:6px 8px; font-size:.85rem;
+  }
+  select{background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px; padding:5px;}
+  button{
+    background:var(--gold); color:#1a1a1a; border:none; border-radius:6px;
+    padding:7px 14px; font-weight:600; cursor:pointer; font-size:.85rem;
+  }
+  button:hover{background:var(--gold-light);}
+  button.secondary{background:#24407a; color:#fff;}
+  .status{margin-top:8px; font-size:.8rem; color:#9fd3a3;}
+  .status.err{color:#ff9b9b;}
+  .hint{color:#8fa0c8; font-size:.75rem; margin-top:6px; line-height:1.4;}
+
+  table.board{width:100%; border-collapse:collapse; background:#0d234f; border-radius:10px; overflow:hidden;}
+  table.board th{
+    background:var(--gold); color:#111; padding:10px 8px; font-size:.78rem; text-transform:uppercase;
+  }
+  table.board td{padding:10px 8px; border-bottom:1px solid #1c3566; vertical-align:middle;}
+  table.board tr:last-child td{border-bottom:none;}
+  .rank{font-weight:700; text-align:center; width:34px; color:var(--gold-light);}
+  .pname{font-weight:700; letter-spacing:.3px;}
+  .total{font-weight:800; text-align:center; color:var(--gold-light); font-size:1.05rem; width:70px;}
+  .teams{display:flex; gap:6px; flex-wrap:wrap;}
+  .badge{
+    display:flex; flex-direction:column; align-items:center; min-width:66px; max-width:78px;
+    padding:5px 6px; border-radius:8px; background:#152c5c; font-size:.68rem; text-align:center;
+  }
+  .flagimg{width:32px; height:auto; border-radius:3px; box-shadow:0 0 0 1px rgba(255,255,255,.25); display:block;}
+  .flagimg-sm{width:20px !important;}
+  .badge span{line-height:1.15;}
+  .badge .pts{font-size:.65rem; color:#a9c1f0; margin-top:2px;}
+  .badge.elim{
+    filter:grayscale(1); opacity:.45; background:var(--gray-bg); color:#333;
+  }
+  .badge.elim .pts{color:#555;}
+  .legend{display:flex; gap:14px; align-items:center; margin:10px 2px; font-size:.75rem; color:#c9d3e8;}
+  .legend .swatch{display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:5px; vertical-align:-2px;}
+  .swatch.active{background:#152c5c; border:1px solid var(--gold);}
+  .swatch.elim{background:var(--gray-bg); filter:grayscale(1); opacity:.6;}
+
+  details.manual{margin-top:6px;}
+  table.manual-table{width:100%; border-collapse:collapse; font-size:.78rem; margin-top:8px;}
+  table.manual-table th, table.manual-table td{padding:5px 6px; border-bottom:1px solid #1c3566; text-align:left;}
+  table.manual-table select, table.manual-table input{width:100%;}
+  pre.debug{max-height:300px; overflow:auto; background:#04102a; padding:8px; border-radius:6px; font-size:.7rem;}
+
+  @media (max-width:640px){
+    table.board thead{display:none;}
+    table.board, table.board tbody, table.board tr, table.board td{display:block; width:100%;}
+    table.board tr{margin-bottom:10px; border:1px solid #1c3566; border-radius:8px; padding:8px;}
+    .rank{text-align:left;}
+    .total{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏆 Quiniela Mundial 2026</h1>
+    <p>Tabla en vivo — puntos calculados según resultados reales del torneo</p>
+  </header>
+
+  <details class="panel" id="settingsPanel">
+    <summary>⚙️ Configuración y actualización de resultados</summary>
+    <div class="row">
+      <button id="refreshBtn" class="secondary">Actualizar resultados</button>
+      <label style="font-size:.8rem;color:#c9d3e8;"><input type="checkbox" id="autoRefreshChk"> Auto-actualizar cada 10 min</label>
+    </div>
+    <div id="statusMsg" class="status"></div>
+    <p class="hint">
+      Los resultados se traen automáticamente con la API key compartida del grupo, así que no necesitas configurar nada para ver la tabla.
+      Si alguna vez quieres usar tu propia API key de football-data.org (por ejemplo si la compartida se queda sin cuota), pégala aquí — se guarda solo en tu navegador y reemplaza la compartida solo para ti.
+    </p>
+    <div class="row">
+      <input type="password" id="apiKeyInput" placeholder="Tu propia API key (opcional)" style="min-width:260px;">
+      <button id="saveKeyBtn">Guardar mi key</button>
+    </div>
+  </details>
+
+  <div class="legend">
+    <span><span class="swatch active"></span>Equipo activo</span>
+    <span><span class="swatch elim"></span>Equipo eliminado</span>
+  </div>
+
+  <table class="board">
+    <thead>
+      <tr><th class="rank">#</th><th>Participante</th><th>Equipos</th><th class="total">Total</th></tr>
+    </thead>
+    <tbody id="boardBody"></tbody>
+  </table>
+
+  <details class="panel manual" id="manualPanel">
+    <summary>🛠️ Ajustes manuales por equipo (anulan el cálculo automático)</summary>
+    <p class="hint">Deja "Auto" y el campo de puntos vacío para usar el cálculo automático del API. Usa esto si un equipo no se detectó bien o quieres corregir algo a mano.</p>
+    <table class="manual-table">
+      <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
+      <tbody id="manualBody"></tbody>
+    </table>
+  </details>
+
+  <details class="panel">
+    <summary>🔍 Datos crudos del último fetch (debug)</summary>
+    <pre class="debug" id="debugOut">Sin datos todavía.</pre>
+  </details>
+</div>
+
+<script>
+const DEFAULT_API_KEY = 'adc318f161df4481b83ab844222f5f2f';
+const API_KEY_STORAGE = 'quiniela_fd_api_key';
+const OVERRIDES_STORAGE = 'quiniela_overrides';
+const MATCHES_CACHE_STORAGE = 'quiniela_matches_cache';
+
+function getApiKey(){
+  return localStorage.getItem(API_KEY_STORAGE) || DEFAULT_API_KEY;
+}
+
+const PARTICIPANTS = [
+  { name: 'IRWING',    teams: ['CG','PA','NO','MX','PT'] },
+  { name: 'SHEKO',     teams: ['NZ','EG','CA','CH','EN'] },
+  { name: 'ABUGABER',  teams: ['CV','PY','CI','EC','BE'] },
+  { name: 'ÑIL',       teams: ['IR','TN','US','KR','FR'] },
+  { name: 'VICTOR',    teams: ['IQ','GH','HR','CO','DE'] },
+  { name: 'PAKUZ',     teams: ['DZ','ZA','JP','UY','NL'] },
+  { name: 'RUBIDIO',   teams: ['UZ','BA','SC','MA','ES'] },
+  { name: 'YORCH',     teams: ['JO','TR','SE','SN','BR'] },
+  { name: 'RENO',      teams: ['SA','AT','CZ','AU','AR'] },
+];
+
+const TEAMS = {
+  CG:{name:'Congo',iso:'cg',aliases:['congo','republic of congo','congo dr']},
+  PA:{name:'Panamá',iso:'pa',aliases:['panama']},
+  NO:{name:'Noruega',iso:'no',aliases:['norway']},
+  MX:{name:'México',iso:'mx',aliases:['mexico']},
+  PT:{name:'Portugal',iso:'pt',aliases:['portugal']},
+  NZ:{name:'Nueva Zelanda',iso:'nz',aliases:['new zealand']},
+  EG:{name:'Egipto',iso:'eg',aliases:['egypt']},
+  CA:{name:'Canadá',iso:'ca',aliases:['canada']},
+  CH:{name:'Suiza',iso:'ch',aliases:['switzerland']},
+  EN:{name:'Inglaterra',iso:'gb-eng',aliases:['england']},
+  CV:{name:'Cabo Verde',iso:'cv',aliases:['cape verde','cabo verde']},
+  PY:{name:'Paraguay',iso:'py',aliases:['paraguay']},
+  CI:{name:'Costa de Marfil',iso:'ci',aliases:['ivory coast',"cote d'ivoire",'côte d’ivoire']},
+  EC:{name:'Ecuador',iso:'ec',aliases:['ecuador']},
+  BE:{name:'Bélgica',iso:'be',aliases:['belgium']},
+  IR:{name:'Irán',iso:'ir',aliases:['iran','ir iran']},
+  TN:{name:'Túnez',iso:'tn',aliases:['tunisia']},
+  US:{name:'Estados Unidos',iso:'us',aliases:['united states','usa']},
+  KR:{name:'Corea del Sur',iso:'kr',aliases:['south korea','korea republic','korea, republic of']},
+  FR:{name:'Francia',iso:'fr',aliases:['france']},
+  IQ:{name:'Irak',iso:'iq',aliases:['iraq']},
+  GH:{name:'Ghana',iso:'gh',aliases:['ghana']},
+  HR:{name:'Croacia',iso:'hr',aliases:['croatia']},
+  CO:{name:'Colombia',iso:'co',aliases:['colombia']},
+  DE:{name:'Alemania',iso:'de',aliases:['germany']},
+  DZ:{name:'Argelia',iso:'dz',aliases:['algeria']},
+  ZA:{name:'Sudáfrica',iso:'za',aliases:['south africa']},
+  JP:{name:'Japón',iso:'jp',aliases:['japan']},
+  UY:{name:'Uruguay',iso:'uy',aliases:['uruguay']},
+  NL:{name:'Holanda',iso:'nl',aliases:['netherlands','holland']},
+  UZ:{name:'Uzbekistán',iso:'uz',aliases:['uzbekistan']},
+  BA:{name:'Bosnia',iso:'ba',aliases:['bosnia and herzegovina','bosnia']},
+  SC:{name:'Escocia',iso:'gb-sct',aliases:['scotland']},
+  MA:{name:'Marruecos',iso:'ma',aliases:['morocco']},
+  ES:{name:'España',iso:'es',aliases:['spain']},
+  JO:{name:'Jordania',iso:'jo',aliases:['jordan']},
+  TR:{name:'Turquía',iso:'tr',aliases:['turkey','turkiye','türkiye']},
+  SE:{name:'Suecia',iso:'se',aliases:['sweden']},
+  SN:{name:'Senegal',iso:'sn',aliases:['senegal']},
+  BR:{name:'Brasil',iso:'br',aliases:['brazil']},
+  SA:{name:'Arabia Saudita',iso:'sa',aliases:['saudi arabia']},
+  AT:{name:'Austria',iso:'at',aliases:['austria']},
+  CZ:{name:'Chequia',iso:'cz',aliases:['czech republic','czechia']},
+  AU:{name:'Australia',iso:'au',aliases:['australia']},
+  AR:{name:'Argentina',iso:'ar',aliases:['argentina']},
+};
+
+function flagImg(code, extraClass){
+  const t = TEAMS[code];
+  return `<img class="flagimg ${extraClass||''}" src="https://flagcdn.com/w80/${t.iso}.png" srcset="https://flagcdn.com/w160/${t.iso}.png 2x" alt="${t.name}" loading="lazy">`;
+}
+
+let lastMatches = null;
+
+function loadOverrides(){
+  try { return JSON.parse(localStorage.getItem(OVERRIDES_STORAGE)) || {}; }
+  catch(e){ return {}; }
+}
+function saveOverrides(ov){ localStorage.setItem(OVERRIDES_STORAGE, JSON.stringify(ov)); }
+
+function normalize(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]','g'),'').trim();
+}
+
+function buildNameLookup(){
+  const map = {};
+  for (const [code, t] of Object.entries(TEAMS)){
+    map[normalize(t.name)] = code;
+    for (const a of t.aliases) map[normalize(a)] = code;
+  }
+  return map;
+}
+
+function computeAutoStats(matches){
+  const stats = {};
+  for (const code in TEAMS) stats[code] = { points:0, played:0, eliminated:false, reachedKnockout:false, reachedQuarters:false };
+  if (!matches || !matches.length) return stats;
+
+  const nameToCode = buildNameLookup();
+
+  function applyForTeam(code, isHome, stage, winner, duration){
+    if (!code) return;
+    const st = stats[code];
+    st.played++;
+    const won  = (isHome && winner==='HOME_TEAM') || (!isHome && winner==='AWAY_TEAM');
+    const lost = (isHome && winner==='AWAY_TEAM') || (!isHome && winner==='HOME_TEAM');
+    const drew = winner === 'DRAW';
+    const isGroup = stage === 'GROUP_STAGE';
+
+    if (isGroup){
+      if (won) st.points += 3;
+      else if (drew) st.points += 1;
+    } else {
+      const extra = duration && duration !== 'REGULAR';
+      if (won) st.points += extra ? 2 : 3;
+      else if (lost) st.points += extra ? 1 : 0;
+      if (lost) st.eliminated = true;
+    }
+    if (!isGroup) st.reachedKnockout = true;
+    if (stage && /QUARTER|SEMI|FINAL|THIRD/i.test(stage)) st.reachedQuarters = true;
+  }
+
+  for (const m of matches){
+    if (m.status !== 'FINISHED') continue;
+    const homeCode = nameToCode[normalize(m.homeTeam && m.homeTeam.name)];
+    const awayCode = nameToCode[normalize(m.awayTeam && m.awayTeam.name)];
+    const winner = m.score && m.score.winner;
+    const duration = m.score && m.score.duration;
+    applyForTeam(homeCode, true, m.stage, winner, duration);
+    applyForTeam(awayCode, false, m.stage, winner, duration);
+  }
+
+  for (const code in stats){
+    const st = stats[code];
+    if (st.reachedKnockout) st.points += 1;
+    if (st.reachedQuarters) st.points += 1;
+  }
+
+  const knockoutDrawExists = matches.some(m => m.stage && m.stage !== 'GROUP_STAGE');
+  for (const code in stats){
+    const st = stats[code];
+    if (!st.eliminated && st.played >= 3 && !st.reachedKnockout && knockoutDrawExists) st.eliminated = true;
+  }
+  return stats;
+}
+
+function effectiveStats(autoStats, overrides){
+  const eff = {};
+  for (const code in TEAMS){
+    const auto = autoStats[code] || {points:0, eliminated:false};
+    const ov = overrides[code] || {};
+    const points = (ov.points !== undefined && ov.points !== null && ov.points !== '') ? Number(ov.points) : auto.points;
+    let eliminated = auto.eliminated;
+    if (ov.elim === 'yes') eliminated = true;
+    if (ov.elim === 'no') eliminated = false;
+    eff[code] = { points, eliminated };
+  }
+  return eff;
+}
+
+function render(){
+  const overrides = loadOverrides();
+  const autoStats = computeAutoStats(lastMatches);
+  const eff = effectiveStats(autoStats, overrides);
+
+  const rows = PARTICIPANTS.map(p => {
+    const total = p.teams.reduce((sum, code) => sum + (eff[code] ? eff[code].points : 0), 0);
+    return { ...p, total };
+  }).sort((a,b) => b.total - a.total);
+
+  const body = document.getElementById('boardBody');
+  body.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td class="pname">${r.name}</td>
+      <td><div class="teams">
+        ${r.teams.map(code => {
+          const t = TEAMS[code];
+          const e = eff[code];
+          return `<div class="badge ${e.eliminated ? 'elim' : ''}">
+            ${flagImg(code)}
+            <span>${t.name}</span>
+            <span class="pts">${e.points} pts</span>
+          </div>`;
+        }).join('')}
+      </div></td>
+      <td class="total">${r.total}</td>
+    </tr>
+  `).join('');
+
+  const manualBody = document.getElementById('manualBody');
+  manualBody.innerHTML = Object.entries(TEAMS).map(([code,t]) => {
+    const auto = autoStats[code] || {points:0, eliminated:false};
+    const ov = overrides[code] || {};
+    return `<tr>
+      <td style="display:flex;align-items:center;gap:6px;">${flagImg(code, 'flagimg-sm')} ${t.name} (${code})</td>
+      <td>${auto.points}</td>
+      <td>${auto.eliminated ? 'Eliminado' : 'Activo'}</td>
+      <td>
+        <select data-code="${code}" data-field="elim" class="ovInput">
+          <option value="auto" ${!ov.elim || ov.elim==='auto' ? 'selected':''}>Auto</option>
+          <option value="yes" ${ov.elim==='yes' ? 'selected':''}>Eliminado</option>
+          <option value="no" ${ov.elim==='no' ? 'selected':''}>Activo</option>
+        </select>
+      </td>
+      <td><input type="number" class="ovInput" data-code="${code}" data-field="points" value="${ov.points ?? ''}" placeholder="auto"></td>
+    </tr>`;
+  }).join('');
+
+  manualBody.querySelectorAll('.ovInput').forEach(el => {
+    el.addEventListener('change', () => {
+      const overrides = loadOverrides();
+      const code = el.dataset.code, field = el.dataset.field;
+      overrides[code] = overrides[code] || {};
+      overrides[code][field] = el.value === '' ? null : el.value;
+      saveOverrides(overrides);
+      render();
+    });
+  });
+}
+
+function showStatus(msg, isErr){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+
+async function fetchResults(){
+  const key = getApiKey();
+  if (!key){ showStatus('No hay API key configurada todavía. Pega una en el panel de configuración.', true); return; }
+  showStatus('Actualizando resultados...', false);
+  try {
+    const res = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
+      headers: { 'X-Auth-Token': key }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    lastMatches = data.matches || [];
+    localStorage.setItem(MATCHES_CACHE_STORAGE, JSON.stringify({ fetchedAt: Date.now(), matches: lastMatches }));
+    document.getElementById('debugOut').textContent = JSON.stringify(lastMatches, null, 2);
+    render();
+    showStatus('Actualizado: ' + new Date().toLocaleString('es-MX'), false);
+  } catch (err) {
+    showStatus('Error al actualizar (' + err.message + '). Revisa la API key; si es un error de CORS usa el modo manual mientras tanto.', true);
+  }
+}
+
+document.getElementById('saveKeyBtn').addEventListener('click', () => {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val){ showStatus('Escribe una API key antes de guardar.', true); return; }
+  localStorage.setItem(API_KEY_STORAGE, val);
+  document.getElementById('apiKeyInput').value = '';
+  showStatus('API key guardada en este navegador.', false);
+});
+
+document.getElementById('refreshBtn').addEventListener('click', fetchResults);
+
+let autoRefreshTimer = null;
+document.getElementById('autoRefreshChk').addEventListener('change', (e) => {
+  if (e.target.checked){
+    autoRefreshTimer = setInterval(fetchResults, 10*60*1000);
+  } else if (autoRefreshTimer){
+    clearInterval(autoRefreshTimer);
+  }
+});
+
+(function init(){
+  if (localStorage.getItem(API_KEY_STORAGE)) {
+    document.getElementById('apiKeyInput').placeholder = 'Tu key guardada (dejar vacío para conservarla)';
+  }
+  try {
+    const cached = JSON.parse(localStorage.getItem(MATCHES_CACHE_STORAGE));
+    if (cached && cached.matches){
+      lastMatches = cached.matches;
+      document.getElementById('debugOut').textContent = JSON.stringify(lastMatches, null, 2);
+      showStatus('Mostrando datos guardados de: ' + new Date(cached.fetchedAt).toLocaleString('es-MX'), false);
+    }
+  } catch(e){}
+  render();
+  if (getApiKey()) fetchResults();
+})();
+</script>
+</body>
+</html>
