@@ -138,7 +138,9 @@
     .teams{gap:1px; flex-wrap:nowrap;}
     .badge{min-width:0; max-width:none; flex:1; padding:1px; border-radius:4px; background:none;}
     .badge .flagimg{width:100%; max-width:20px;}
-    .badge span, .badge .pts{display:none;}
+    .badge .tname, .badge .pts-label{display:none;}
+    .badge .pts{font-size:.5rem; margin-top:0; color:#a9c1f0;}
+    .badge.elim .pts{color:#555;}
   }
 </style>
 </head>
@@ -433,8 +435,8 @@ function render(){
           const e = eff[code];
           return `<div class="badge ${e.eliminated ? 'elim' : ''}">
             ${flagImg(code)}
-            <span>${t.name}</span>
-            <span class="pts">${e.points} pts</span>
+            <span class="tname">${t.name}</span>
+            <span class="pts"><span class="pts-num">${e.points}</span><span class="pts-label"> pts</span></span>
           </div>`;
         }).join('')}
       </div></td>
