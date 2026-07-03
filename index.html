@@ -92,6 +92,7 @@
   .rank{font-weight:700; text-align:center; width:34px; color:var(--gold-light);}
   .pname{font-weight:700; letter-spacing:.3px;}
   .total{font-weight:800; text-align:center; color:var(--gold-light); font-size:1.05rem; width:70px;}
+  .bono{font-weight:700; text-align:center; color:#a9c1f0; font-size:.9rem; width:56px;}
   .teams{display:flex; gap:6px; flex-wrap:wrap;}
   .badge{
     display:flex; flex-direction:column; align-items:center; min-width:66px; max-width:78px;
@@ -131,9 +132,10 @@
     table.board{table-layout:fixed;}
     table.board thead{display:none;}
     table.board th, table.board td{padding:3px 1px;}
-    .rank{width:7%; font-size:.6rem;}
-    .pname{width:23%; font-size:.58rem; letter-spacing:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:2px !important;}
-    .total{width:12%; font-size:.62rem;}
+    .rank{width:6%; font-size:.6rem;}
+    .pname{width:19%; font-size:.58rem; letter-spacing:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:2px !important;}
+    .bono{width:9%; font-size:.6rem;}
+    .total{width:11%; font-size:.62rem;}
 
     .teams{gap:1px; flex-wrap:nowrap;}
     .badge{min-width:0; max-width:none; flex:1; padding:1px; border-radius:4px; background:none;}
@@ -182,7 +184,7 @@
 
   <table class="board">
     <thead>
-      <tr><th class="rank">#</th><th>Participante</th><th>Equipos</th><th class="total">Total</th></tr>
+      <tr><th class="rank">#</th><th>Participante</th><th>Equipos</th><th class="bono">Bono</th><th class="total">Total</th></tr>
     </thead>
     <tbody id="boardBody"></tbody>
   </table>
@@ -197,7 +199,7 @@
     <div id="manualContent" style="display:none;">
       <p class="hint">Deja "Auto" y el campo de puntos vacío para usar el cálculo automático del API. Usa esto si un equipo no se detectó bien o quieres corregir algo a mano.</p>
       <table class="manual-table">
-        <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
+        <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: bono</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
         <tbody id="manualBody"></tbody>
       </table>
     </div>
@@ -325,7 +327,7 @@ function buildNameLookup(){
 
 function computeAutoStats(matches){
   const stats = {};
-  for (const code in TEAMS) stats[code] = { points:0, played:0, eliminated:false, reachedKnockout:false, reachedQuarters:false };
+  for (const code in TEAMS) stats[code] = { rawPoints:0, bonus:0, played:0, eliminated:false, reachedKnockout:false, reachedQuarters:false };
   if (!matches || !matches.length) return stats;
 
   const nameToCode = buildNameLookup();
@@ -365,12 +367,12 @@ function computeAutoStats(matches){
     const isGroup = stage === 'GROUP_STAGE';
 
     if (isGroup){
-      if (won) st.points += 3;
-      else if (drew) st.points += 1;
+      if (won) st.rawPoints += 3;
+      else if (drew) st.rawPoints += 1;
     } else {
       const extra = duration && duration !== 'REGULAR';
-      if (won) st.points += extra ? 2 : 3;
-      else if (lost) st.points += extra ? 1 : 0;
+      if (won) st.rawPoints += extra ? 2 : 3;
+      else if (lost) st.rawPoints += extra ? 1 : 0;
       if (lost) st.eliminated = true;
     }
   }
@@ -387,8 +389,8 @@ function computeAutoStats(matches){
 
   for (const code in stats){
     const st = stats[code];
-    if (st.reachedKnockout) st.points += 1;
-    if (st.reachedQuarters) st.points += 1;
+    if (st.reachedKnockout) st.bonus += 1;
+    if (st.reachedQuarters) st.bonus += 1;
   }
 
   if (bracketFullyKnown){
@@ -403,13 +405,14 @@ function computeAutoStats(matches){
 function effectiveStats(autoStats, overrides){
   const eff = {};
   for (const code in TEAMS){
-    const auto = autoStats[code] || {points:0, eliminated:false};
+    const auto = autoStats[code] || {rawPoints:0, bonus:0, eliminated:false};
     const ov = overrides[code] || {};
-    const points = (ov.points !== undefined && ov.points !== null && ov.points !== '') ? Number(ov.points) : auto.points;
+    const rawPoints = (ov.points !== undefined && ov.points !== null && ov.points !== '') ? Number(ov.points) : auto.rawPoints;
+    const bonus = auto.bonus;
     let eliminated = auto.eliminated;
     if (ov.elim === 'yes') eliminated = true;
     if (ov.elim === 'no') eliminated = false;
-    eff[code] = { points, eliminated };
+    eff[code] = { rawPoints, bonus, points: rawPoints + bonus, eliminated };
   }
   return eff;
 }
@@ -420,8 +423,9 @@ function render(){
   const eff = effectiveStats(autoStats, overrides);
 
   const rows = PARTICIPANTS.map(p => {
+    const bonus = p.teams.reduce((sum, code) => sum + (eff[code] ? eff[code].bonus : 0), 0);
     const total = p.teams.reduce((sum, code) => sum + (eff[code] ? eff[code].points : 0), 0);
-    return { ...p, total };
+    return { ...p, bonus, total };
   }).sort((a,b) => b.total - a.total);
 
   const body = document.getElementById('boardBody');
@@ -436,21 +440,23 @@ function render(){
           return `<div class="badge ${e.eliminated ? 'elim' : ''}">
             ${flagImg(code)}
             <span class="tname">${t.name}</span>
-            <span class="pts"><span class="pts-num">${e.points}</span><span class="pts-label"> pts</span></span>
+            <span class="pts"><span class="pts-num">${e.rawPoints}</span><span class="pts-label"> pts</span></span>
           </div>`;
         }).join('')}
       </div></td>
+      <td class="bono">${r.bonus}</td>
       <td class="total">${r.total}</td>
     </tr>
   `).join('');
 
   const manualBody = document.getElementById('manualBody');
   manualBody.innerHTML = Object.entries(TEAMS).map(([code,t]) => {
-    const auto = autoStats[code] || {points:0, eliminated:false};
+    const auto = autoStats[code] || {rawPoints:0, bonus:0, eliminated:false};
     const ov = overrides[code] || {};
     return `<tr>
       <td style="display:flex;align-items:center;gap:6px;">${flagImg(code, 'flagimg-sm')} ${t.name} (${code})</td>
-      <td>${auto.points}</td>
+      <td>${auto.rawPoints}</td>
+      <td>${auto.bonus}</td>
       <td>${auto.eliminated ? 'Eliminado' : 'Activo'}</td>
       <td>
         <select data-code="${code}" data-field="elim" class="ovInput">
