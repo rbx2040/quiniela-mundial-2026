@@ -117,29 +117,28 @@
   pre.debug{max-height:300px; overflow:auto; background:#04102a; padding:8px; border-radius:6px; font-size:.7rem;}
 
   @media (max-width:640px){
-    body{padding:13px;}
-    header{padding:14px 8px;}
-    header h1{font-size:1.28rem; gap:6px;}
-    header p{font-size:.68rem;}
-    .ball-icon{width:22px; height:22px; vertical-align:-5px;}
-    .panel{padding:10px 11px; font-size:.7rem;}
-    .flag-ticker{padding:6px 0;}
-    .flag-ticker .item{padding:0 9px; min-width:35px; gap:2px;}
-    .flag-ticker img{width:21px;}
-    .flag-ticker .item span{font-size:.5rem;}
+    body{padding:8px;}
+    header{padding:10px 6px;}
+    header h1{font-size:1.05rem; gap:4px;}
+    header p{font-size:.6rem;}
+    .ball-icon{width:18px; height:18px; vertical-align:-4px;}
+    .panel{padding:8px 9px; font-size:.68rem;}
+    .flag-ticker{padding:5px 0;}
+    .flag-ticker .item{padding:0 7px; min-width:30px; gap:2px;}
+    .flag-ticker img{width:18px;}
+    .flag-ticker .item span{font-size:.48rem;}
 
+    table.board{table-layout:fixed;}
     table.board thead{display:none;}
-    table.board, table.board tbody, table.board tr, table.board td{display:block; width:100%;}
-    table.board tr{margin-bottom:8px; border:1px solid #1c3566; border-radius:8px; padding:6px;}
-    table.board td{padding:6px 5px;}
-    .rank{text-align:left; font-size:.85rem;}
-    .pname{font-size:.85rem;}
-    .total{text-align:left; font-size:.85rem;}
+    table.board th, table.board td{padding:3px 1px;}
+    .rank{width:7%; font-size:.6rem;}
+    .pname{width:23%; font-size:.58rem; letter-spacing:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:2px !important;}
+    .total{width:12%; font-size:.62rem;}
 
-    .teams{gap:5px;}
-    .badge{min-width:53px; max-width:62px; padding:4px 5px; font-size:.55rem;}
-    .flagimg{width:26px;}
-    .badge .pts{font-size:.52rem;}
+    .teams{gap:1px; flex-wrap:nowrap;}
+    .badge{min-width:0; max-width:none; flex:1; padding:1px; border-radius:4px; background:none;}
+    .badge .flagimg{width:100%; max-width:20px;}
+    .badge span, .badge .pts{display:none;}
   }
 </style>
 </head>
