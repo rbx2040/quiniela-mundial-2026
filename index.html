@@ -120,11 +120,18 @@
 
   <details class="panel manual" id="manualPanel">
     <summary>🛠️ Ajustes manuales por equipo (anulan el cálculo automático)</summary>
-    <p class="hint">Deja "Auto" y el campo de puntos vacío para usar el cálculo automático del API. Usa esto si un equipo no se detectó bien o quieres corregir algo a mano.</p>
-    <table class="manual-table">
-      <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
-      <tbody id="manualBody"></tbody>
-    </table>
+    <div id="manualLock" class="row">
+      <input type="password" id="manualPassword" placeholder="Contraseña">
+      <button id="manualUnlockBtn">Desbloquear</button>
+      <span id="manualLockMsg" class="status err"></span>
+    </div>
+    <div id="manualContent" style="display:none;">
+      <p class="hint">Deja "Auto" y el campo de puntos vacío para usar el cálculo automático del API. Usa esto si un equipo no se detectó bien o quieres corregir algo a mano.</p>
+      <table class="manual-table">
+        <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
+        <tbody id="manualBody"></tbody>
+      </table>
+    </div>
   </details>
 
   <details class="panel">
@@ -135,6 +142,8 @@
 
 <script>
 const MATCHES_ENDPOINT = '/.netlify/functions/matches';
+const MANUAL_PASSWORD = 'rBx2040';
+const MANUAL_UNLOCK_STORAGE = 'quiniela_manual_unlocked';
 const OVERRIDES_STORAGE = 'quiniela_overrides';
 const MATCHES_CACHE_STORAGE = 'quiniela_matches_cache';
 
@@ -398,6 +407,25 @@ async function fetchResults(){
   }
 }
 
+function updateManualLock(){
+  const unlocked = sessionStorage.getItem(MANUAL_UNLOCK_STORAGE) === 'yes';
+  document.getElementById('manualLock').style.display = unlocked ? 'none' : 'flex';
+  document.getElementById('manualContent').style.display = unlocked ? 'block' : 'none';
+}
+
+document.getElementById('manualUnlockBtn').addEventListener('click', () => {
+  const val = document.getElementById('manualPassword').value;
+  const msg = document.getElementById('manualLockMsg');
+  if (val === MANUAL_PASSWORD){
+    sessionStorage.setItem(MANUAL_UNLOCK_STORAGE, 'yes');
+    document.getElementById('manualPassword').value = '';
+    msg.textContent = '';
+    updateManualLock();
+  } else {
+    msg.textContent = 'Contraseña incorrecta.';
+  }
+});
+
 document.getElementById('refreshBtn').addEventListener('click', fetchResults);
 
 let autoRefreshTimer = null;
@@ -418,6 +446,7 @@ document.getElementById('autoRefreshChk').addEventListener('change', (e) => {
       showStatus('Mostrando datos guardados de: ' + new Date(cached.fetchedAt).toLocaleString('es-MX'), false);
     }
   } catch(e){}
+  updateManualLock();
   render();
   fetchResults();
 })();
