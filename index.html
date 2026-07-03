@@ -102,13 +102,8 @@
     </div>
     <div id="statusMsg" class="status"></div>
     <p class="hint">
-      Los resultados se traen automáticamente con la API key compartida del grupo, así que no necesitas configurar nada para ver la tabla.
-      Si alguna vez quieres usar tu propia API key de football-data.org (por ejemplo si la compartida se queda sin cuota), pégala aquí — se guarda solo en tu navegador y reemplaza la compartida solo para ti.
+      Los resultados se traen automáticamente a través de una función del servidor (Netlify Functions), así que no necesitas configurar nada para ver la tabla.
     </p>
-    <div class="row">
-      <input type="password" id="apiKeyInput" placeholder="Tu propia API key (opcional)" style="min-width:260px;">
-      <button id="saveKeyBtn">Guardar mi key</button>
-    </div>
   </details>
 
   <div class="legend">
@@ -139,14 +134,9 @@
 </div>
 
 <script>
-const DEFAULT_API_KEY = 'adc318f161df4481b83ab844222f5f2f';
-const API_KEY_STORAGE = 'quiniela_fd_api_key';
+const MATCHES_ENDPOINT = '/.netlify/functions/matches';
 const OVERRIDES_STORAGE = 'quiniela_overrides';
 const MATCHES_CACHE_STORAGE = 'quiniela_matches_cache';
-
-function getApiKey(){
-  return localStorage.getItem(API_KEY_STORAGE) || DEFAULT_API_KEY;
-}
 
 const PARTICIPANTS = [
   { name: 'IRWING',    teams: ['CG','PA','NO','MX','PT'] },
@@ -369,13 +359,9 @@ function showStatus(msg, isErr){
 }
 
 async function fetchResults(){
-  const key = getApiKey();
-  if (!key){ showStatus('No hay API key configurada todavía. Pega una en el panel de configuración.', true); return; }
   showStatus('Actualizando resultados...', false);
   try {
-    const res = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
-      headers: { 'X-Auth-Token': key }
-    });
+    const res = await fetch(MATCHES_ENDPOINT);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     lastMatches = data.matches || [];
@@ -384,17 +370,9 @@ async function fetchResults(){
     render();
     showStatus('Actualizado: ' + new Date().toLocaleString('es-MX'), false);
   } catch (err) {
-    showStatus('Error al actualizar (' + err.message + '). Revisa la API key; si es un error de CORS usa el modo manual mientras tanto.', true);
+    showStatus('Error al actualizar (' + err.message + '). Usa el modo manual mientras tanto.', true);
   }
 }
-
-document.getElementById('saveKeyBtn').addEventListener('click', () => {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val){ showStatus('Escribe una API key antes de guardar.', true); return; }
-  localStorage.setItem(API_KEY_STORAGE, val);
-  document.getElementById('apiKeyInput').value = '';
-  showStatus('API key guardada en este navegador.', false);
-});
 
 document.getElementById('refreshBtn').addEventListener('click', fetchResults);
 
@@ -408,9 +386,6 @@ document.getElementById('autoRefreshChk').addEventListener('change', (e) => {
 });
 
 (function init(){
-  if (localStorage.getItem(API_KEY_STORAGE)) {
-    document.getElementById('apiKeyInput').placeholder = 'Tu key guardada (dejar vacío para conservarla)';
-  }
   try {
     const cached = JSON.parse(localStorage.getItem(MATCHES_CACHE_STORAGE));
     if (cached && cached.matches){
@@ -420,7 +395,7 @@ document.getElementById('autoRefreshChk').addEventListener('change', (e) => {
     }
   } catch(e){}
   render();
-  if (getApiKey()) fetchResults();
+  fetchResults();
 })();
 </script>
 </body>
