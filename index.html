@@ -10,6 +10,7 @@
     --green:#0f3d24; --gray:#7a7a7a; --gray-bg:#e9e9e9;
   }
   *{box-sizing:border-box;}
+  html, body{overflow-x:hidden;}
   body{
     margin:0; font-family:'Segoe UI',Arial,sans-serif;
     background:linear-gradient(160deg,var(--navy) 0%,#04102a 100%);
@@ -116,11 +117,29 @@
   pre.debug{max-height:300px; overflow:auto; background:#04102a; padding:8px; border-radius:6px; font-size:.7rem;}
 
   @media (max-width:640px){
+    body{padding:13px;}
+    header{padding:14px 8px;}
+    header h1{font-size:1.28rem; gap:6px;}
+    header p{font-size:.68rem;}
+    .ball-icon{width:22px; height:22px; vertical-align:-5px;}
+    .panel{padding:10px 11px; font-size:.7rem;}
+    .flag-ticker{padding:6px 0;}
+    .flag-ticker .item{padding:0 9px; min-width:35px; gap:2px;}
+    .flag-ticker img{width:21px;}
+    .flag-ticker .item span{font-size:.5rem;}
+
     table.board thead{display:none;}
     table.board, table.board tbody, table.board tr, table.board td{display:block; width:100%;}
-    table.board tr{margin-bottom:10px; border:1px solid #1c3566; border-radius:8px; padding:8px;}
-    .rank{text-align:left;}
-    .total{text-align:left;}
+    table.board tr{margin-bottom:8px; border:1px solid #1c3566; border-radius:8px; padding:6px;}
+    table.board td{padding:6px 5px;}
+    .rank{text-align:left; font-size:.85rem;}
+    .pname{font-size:.85rem;}
+    .total{text-align:left; font-size:.85rem;}
+
+    .teams{gap:5px;}
+    .badge{min-width:53px; max-width:62px; padding:4px 5px; font-size:.55rem;}
+    .flagimg{width:26px;}
+    .badge .pts{font-size:.52rem;}
   }
 </style>
 </head>
