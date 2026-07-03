@@ -139,7 +139,7 @@ const OVERRIDES_STORAGE = 'quiniela_overrides';
 const MATCHES_CACHE_STORAGE = 'quiniela_matches_cache';
 
 const PARTICIPANTS = [
-  { name: 'IRWING',    teams: ['CG','PA','NO','MX','PT'] },
+  { name: 'IRWING',    teams: ['CD','PA','NO','MX','PT'] },
   { name: 'SHEKO',     teams: ['NZ','EG','CA','CH','EN'] },
   { name: 'ABUGABER',  teams: ['CV','PY','CI','EC','BE'] },
   { name: 'ÑIL',       teams: ['IR','TN','US','KR','FR'] },
@@ -151,7 +151,7 @@ const PARTICIPANTS = [
 ];
 
 const TEAMS = {
-  CG:{name:'Congo',iso:'cg',aliases:['congo','republic of congo','congo dr']},
+  CD:{name:'RD Congo',iso:'cd',aliases:['congo dr','dr congo','democratic republic of congo','democratic republic of the congo','congo-kinshasa']},
   PA:{name:'Panamá',iso:'pa',aliases:['panama']},
   NO:{name:'Noruega',iso:'no',aliases:['norway']},
   MX:{name:'México',iso:'mx',aliases:['mexico']},
@@ -161,7 +161,7 @@ const TEAMS = {
   CA:{name:'Canadá',iso:'ca',aliases:['canada']},
   CH:{name:'Suiza',iso:'ch',aliases:['switzerland']},
   EN:{name:'Inglaterra',iso:'gb-eng',aliases:['england']},
-  CV:{name:'Cabo Verde',iso:'cv',aliases:['cape verde','cabo verde']},
+  CV:{name:'Cabo Verde',iso:'cv',aliases:['cape verde','cabo verde','cape verde islands']},
   PY:{name:'Paraguay',iso:'py',aliases:['paraguay']},
   CI:{name:'Costa de Marfil',iso:'ci',aliases:['ivory coast',"cote d'ivoire",'côte d’ivoire']},
   EC:{name:'Ecuador',iso:'ec',aliases:['ecuador']},
@@ -182,7 +182,7 @@ const TEAMS = {
   UY:{name:'Uruguay',iso:'uy',aliases:['uruguay']},
   NL:{name:'Holanda',iso:'nl',aliases:['netherlands','holland']},
   UZ:{name:'Uzbekistán',iso:'uz',aliases:['uzbekistan']},
-  BA:{name:'Bosnia',iso:'ba',aliases:['bosnia and herzegovina','bosnia']},
+  BA:{name:'Bosnia',iso:'ba',aliases:['bosnia and herzegovina','bosnia','bosnia-herzegovina']},
   SC:{name:'Escocia',iso:'gb-sct',aliases:['scotland']},
   MA:{name:'Marruecos',iso:'ma',aliases:['morocco']},
   ES:{name:'España',iso:'es',aliases:['spain']},
@@ -231,6 +231,31 @@ function computeAutoStats(matches){
 
   const nameToCode = buildNameLookup();
 
+  // Stage participation (qualifying for knockouts) is known as soon as a fixture is
+  // scheduled with the team's name — long before that fixture is FINISHED. Using only
+  // finished matches here would wrongly flag still-alive teams as eliminated while their
+  // next match is merely scheduled or in play.
+  for (const m of matches){
+    if (!m.stage || m.stage === 'GROUP_STAGE') continue;
+    for (const side of [m.homeTeam, m.awayTeam]){
+      if (!side || !side.name) continue;
+      const code = nameToCode[normalize(side.name)];
+      if (!code) continue;
+      stats[code].reachedKnockout = true;
+      if (/QUARTER|SEMI|FINAL|THIRD/i.test(m.stage)) stats[code].reachedQuarters = true;
+    }
+  }
+
+  // Only trust "didn't qualify" elimination once the full Round-of-32 bracket (32 slots) is public.
+  const last32Names = new Set();
+  matches.forEach(m => {
+    if (m.stage !== 'LAST_32') return;
+    for (const side of [m.homeTeam, m.awayTeam]){
+      if (side && side.name) last32Names.add(normalize(side.name));
+    }
+  });
+  const bracketFullyKnown = last32Names.size >= 32;
+
   function applyForTeam(code, isHome, stage, winner, duration){
     if (!code) return;
     const st = stats[code];
@@ -249,8 +274,6 @@ function computeAutoStats(matches){
       else if (lost) st.points += extra ? 1 : 0;
       if (lost) st.eliminated = true;
     }
-    if (!isGroup) st.reachedKnockout = true;
-    if (stage && /QUARTER|SEMI|FINAL|THIRD/i.test(stage)) st.reachedQuarters = true;
   }
 
   for (const m of matches){
@@ -269,10 +292,11 @@ function computeAutoStats(matches){
     if (st.reachedQuarters) st.points += 1;
   }
 
-  const knockoutDrawExists = matches.some(m => m.stage && m.stage !== 'GROUP_STAGE');
-  for (const code in stats){
-    const st = stats[code];
-    if (!st.eliminated && st.played >= 3 && !st.reachedKnockout && knockoutDrawExists) st.eliminated = true;
+  if (bracketFullyKnown){
+    for (const code in stats){
+      const st = stats[code];
+      if (!st.eliminated && st.played >= 3 && !st.reachedKnockout) st.eliminated = true;
+    }
   }
   return stats;
 }
