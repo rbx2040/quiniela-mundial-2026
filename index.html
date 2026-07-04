@@ -325,6 +325,20 @@ function buildNameLookup(){
   return map;
 }
 
+function deriveWinner(score){
+  if (!score) return null;
+  if (score.winner) return score.winner;
+  // Some FINISHED matches (seen on penalty-shootout results) omit "winner" from the API.
+  // Fall back to comparing score fields, from most specific to least, to recover it.
+  for (const field of ['penalties', 'extraTime', 'regularTime', 'fullTime']){
+    const s = score[field];
+    if (s && typeof s.home === 'number' && typeof s.away === 'number' && s.home !== s.away){
+      return s.home > s.away ? 'HOME_TEAM' : 'AWAY_TEAM';
+    }
+  }
+  return null;
+}
+
 function computeAutoStats(matches){
   const stats = {};
   for (const code in TEAMS) stats[code] = { rawPoints:0, bonus:0, played:0, eliminated:false, reachedKnockout:false, reachedQuarters:false };
@@ -381,7 +395,7 @@ function computeAutoStats(matches){
     if (m.status !== 'FINISHED') continue;
     const homeCode = nameToCode[normalize(m.homeTeam && m.homeTeam.name)];
     const awayCode = nameToCode[normalize(m.awayTeam && m.awayTeam.name)];
-    const winner = m.score && m.score.winner;
+    const winner = deriveWinner(m.score);
     const duration = m.score && m.score.duration;
     applyForTeam(homeCode, true, m.stage, winner, duration);
     applyForTeam(awayCode, false, m.stage, winner, duration);
