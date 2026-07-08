@@ -44,3 +44,10 @@ export async function loadGame(slug) {
   const store = getGamesStore();
   return store.get(slug, { type: 'json' });
 }
+
+export async function listGames() {
+  const store = getGamesStore();
+  const { blobs } = await store.list();
+  const games = await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })));
+  return games.filter(Boolean);
+}

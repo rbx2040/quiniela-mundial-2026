@@ -59,6 +59,9 @@
       <label for="gameName">Nombre de la quiniela</label>
       <input type="text" id="gameName" placeholder="Familia López" required maxlength="60">
 
+      <label for="creatorName">Tu nombre</label>
+      <input type="text" id="creatorName" placeholder="¿Quién está creando esta quiniela?" required maxlength="40">
+
       <label for="tournament">Torneo</label>
       <select id="tournament">
         <option value="WC2026">Mundial 2026</option>
@@ -132,6 +135,7 @@ form.addEventListener('submit', async (e) => {
 
   const payload = {
     gameName: document.getElementById('gameName').value.trim(),
+    creatorName: document.getElementById('creatorName').value.trim(),
     tournament: document.getElementById('tournament').value,
     stage: document.getElementById('stage').value,
     players,

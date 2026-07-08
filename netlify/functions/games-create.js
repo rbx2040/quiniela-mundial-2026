@@ -32,10 +32,13 @@ export default async (req) => {
     return jsonResponse(400, { error: 'JSON inválido' });
   }
 
-  const { gameName, tournament, stage, players, adminPassword } = body || {};
+  const { gameName, creatorName, tournament, stage, players, adminPassword } = body || {};
 
   if (typeof gameName !== 'string' || !gameName.trim()) {
     return jsonResponse(400, { error: 'Falta el nombre de la quiniela' });
+  }
+  if (typeof creatorName !== 'string' || !creatorName.trim()) {
+    return jsonResponse(400, { error: 'Falta tu nombre (el de quien crea la quiniela)' });
   }
   if (!VALID_TOURNAMENTS.includes(tournament)) {
     return jsonResponse(400, { error: 'Torneo inválido' });
@@ -83,6 +86,7 @@ export default async (req) => {
   const game = {
     slug,
     gameName: gameName.trim(),
+    creatorName: creatorName.trim(),
     tournament,
     stage,
     createdAt: new Date().toISOString(),

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de administración</title>
+<style>
+  :root{
+    --navy:#0a1a3a; --navy-2:#132a5c; --gold:#d4af37; --gold-light:#f3d97a;
+  }
+  *{box-sizing:border-box;}
+  html, body{overflow-x:hidden;}
+  body{
+    margin:0; font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(160deg,var(--navy) 0%,#04102a 100%);
+    color:#fff; min-height:100vh; padding:16px;
+  }
+  .wrap{max-width:900px; margin:0 auto;}
+  header{
+    text-align:center; padding:18px 10px; border:2px solid var(--gold);
+    border-radius:14px; background:linear-gradient(180deg,#0d234f,#081a3d);
+    margin-bottom:16px; box-shadow:0 0 20px rgba(212,175,55,.25);
+  }
+  header h1{margin:0 0 4px; color:var(--gold-light); font-size:1.4rem;}
+  header p{margin:0; color:#c9d3e8; font-size:.85rem;}
+  .panel{
+    background:#0d234f; border:1px solid #24407a; border-radius:10px;
+    padding:16px; font-size:.9rem; margin-bottom:14px;
+  }
+  input[type=password]{
+    background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px;
+    padding:8px; font-size:.9rem;
+  }
+  button{
+    background:var(--gold); color:#1a1a1a; border:none; border-radius:6px;
+    padding:8px 14px; font-weight:700; cursor:pointer; font-size:.9rem;
+  }
+  button:hover{background:var(--gold-light);}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .status{margin-top:10px; font-size:.85rem; color:#9fd3a3;}
+  .status.err{color:#ff9b9b;}
+
+  table.board{width:100%; border-collapse:collapse; background:#0d234f; border-radius:10px; overflow:hidden;}
+  table.board th{background:var(--gold); color:#111; padding:8px; font-size:.75rem; text-transform:uppercase; text-align:left;}
+  table.board td{padding:8px; border-bottom:1px solid #1c3566; font-size:.85rem;}
+  table.board tr:last-child td{border-bottom:none;}
+  table.board a{color:var(--gold-light);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛠️ Panel de administración</h1>
+    <p>Todas las quinielas creadas en el sitio</p>
+  </header>
+
+  <div class="panel" id="lockPanel">
+    <div class="row">
+      <input type="password" id="adminPassword" placeholder="Contraseña de administrador del sitio">
+      <button id="unlockBtn">Ver quinielas</button>
+    </div>
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+  <table class="board" id="gamesTable" style="display:none;">
+    <thead>
+      <tr><th>Quiniela</th><th>Creador</th><th>Torneo</th><th>Etapa</th><th>Jugadores</th><th>Creado</th></tr>
+    </thead>
+    <tbody id="gamesBody"></tbody>
+  </table>
+</div>
+
+<script>
+const STORAGE_KEY = 'quiniela_site_admin_password';
+const STAGE_LABELS = {
+  GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos', LAST_16: 'Octavos de final',
+  QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
+};
+
+function showStatus(msg, isErr){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+
+async function loadGames(password){
+  showStatus('Cargando...', false);
+  try {
+    const res = await fetch('/.netlify/functions/games-list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al cargar la lista');
+
+    sessionStorage.setItem(STORAGE_KEY, password);
+    document.getElementById('lockPanel').style.display = 'none';
+    const table = document.getElementById('gamesTable');
+    table.style.display = 'table';
+
+    document.getElementById('gamesBody').innerHTML = data.games.map(g => `
+      <tr>
+        <td><a href="/g/${g.slug}" target="_blank">${g.gameName}</a></td>
+        <td>${g.creatorName}</td>
+        <td>${g.tournament}</td>
+        <td>${STAGE_LABELS[g.stage] || g.stage}</td>
+        <td>${g.playerCount}</td>
+        <td>${new Date(g.createdAt).toLocaleString('es-MX')}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="6">No hay quinielas creadas todavía.</td></tr>';
+  } catch (err) {
+    showStatus(err.message, true);
+  }
+}
+
+document.getElementById('unlockBtn').addEventListener('click', () => {
+  const password = document.getElementById('adminPassword').value;
+  loadGames(password);
+});
+
+(function init(){
+  const stored = sessionStorage.getItem(STORAGE_KEY);
+  if (stored) loadGames(stored);
+})();
+</script>
+</body>
+</html>
