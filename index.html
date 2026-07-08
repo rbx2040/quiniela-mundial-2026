@@ -115,7 +115,7 @@
   table.manual-table{width:100%; border-collapse:collapse; font-size:.78rem; margin-top:8px;}
   table.manual-table th, table.manual-table td{padding:5px 6px; border-bottom:1px solid #1c3566; text-align:left;}
   table.manual-table select, table.manual-table input{width:100%;}
-  pre.debug{max-height:300px; overflow:auto; background:#04102a; padding:8px; border-radius:6px; font-size:.7rem;}
+  pre.debug{max-height:300px; overflow:auto; background:#04102a; padding:8px; border-radius:6px; font-size:.7rem; margin-top:8px;}
 
   @media (max-width:640px){
     body{padding:8px;}
@@ -207,6 +207,7 @@
 
   <details class="panel">
     <summary>🔍 Datos crudos del último fetch (debug)</summary>
+    <button id="copyDebugBtn" class="secondary">📋 Copiar todo</button>
     <pre class="debug" id="debugOut">Sin datos todavía.</pre>
   </details>
 </div>
@@ -540,6 +541,26 @@ document.getElementById('manualUnlockBtn').addEventListener('click', () => {
 });
 
 document.getElementById('refreshBtn').addEventListener('click', fetchResults);
+
+document.getElementById('copyDebugBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('copyDebugBtn');
+  const text = document.getElementById('debugOut').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  const original = btn.textContent;
+  btn.textContent = '✅ Copiado';
+  setTimeout(() => { btn.textContent = original; }, 2000);
+});
 
 let autoRefreshTimer = null;
 document.getElementById('autoRefreshChk').addEventListener('change', (e) => {
