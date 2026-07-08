@@ -388,6 +388,9 @@ function computeAutoStats(matches){
       if (won) st.rawPoints += extra ? 2 : 3;
       else if (lost) st.rawPoints += extra ? 1 : 0;
       if (lost) st.eliminated = true;
+      // Winning the Round of 16 clinches a quarterfinal berth even before the API
+      // publishes the actual QUARTER_FINALS fixture with the team's name attached.
+      if (won && stage === 'LAST_16') st.reachedQuarters = true;
     }
   }
 
