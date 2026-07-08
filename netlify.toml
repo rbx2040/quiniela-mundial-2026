@@ -1,2 +1,7 @@
 [build]
   functions = "netlify/functions"
+
+[[redirects]]
+  from = "/g/:slug"
+  to = "/game.html?slug=:slug"
+  status = 200

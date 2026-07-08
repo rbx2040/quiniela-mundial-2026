@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiniela</title>
+<style>
+  :root{
+    --navy:#0a1a3a; --navy-2:#132a5c; --gold:#d4af37; --gold-light:#f3d97a;
+    --gray-bg:#e9e9e9;
+  }
+  *{box-sizing:border-box;}
+  html, body{overflow-x:hidden;}
+  body{
+    margin:0; font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(160deg,var(--navy) 0%,#04102a 100%);
+    color:#fff; min-height:100vh; padding:16px;
+  }
+  .wrap{max-width:900px; margin:0 auto;}
+  header{
+    text-align:center; padding:18px 10px; border:2px solid var(--gold);
+    border-radius:14px; background:linear-gradient(180deg,#0d234f,#081a3d);
+    margin-bottom:16px; box-shadow:0 0 20px rgba(212,175,55,.25);
+  }
+  header h1{margin:0 0 4px; color:var(--gold-light); font-size:1.4rem;}
+  header p{margin:0; color:#c9d3e8; font-size:.85rem;}
+
+  .panel{
+    background:#0d234f; border:1px solid #24407a; border-radius:10px;
+    padding:12px 14px; margin-bottom:14px; font-size:.85rem;
+  }
+  .panel summary{cursor:pointer; color:var(--gold-light); font-weight:600; outline:none;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+  input[type=text], input[type=password], input[type=number]{
+    background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px;
+    padding:6px 8px; font-size:.85rem;
+  }
+  select{background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px; padding:5px;}
+  button{
+    background:var(--gold); color:#1a1a1a; border:none; border-radius:6px;
+    padding:7px 14px; font-weight:600; cursor:pointer; font-size:.85rem;
+  }
+  button:hover{background:var(--gold-light);}
+  button.secondary{background:#24407a; color:#fff;}
+  .status{margin-top:8px; font-size:.8rem; color:#9fd3a3;}
+  .status.err{color:#ff9b9b;}
+  .hint{color:#8fa0c8; font-size:.75rem; margin-top:6px; line-height:1.4;}
+
+  table.board{width:100%; border-collapse:collapse; background:#0d234f; border-radius:10px; overflow:hidden;}
+  table.board th{
+    background:var(--gold); color:#111; padding:10px 8px; font-size:.78rem; text-transform:uppercase;
+  }
+  table.board td{padding:10px 8px; border-bottom:1px solid #1c3566; vertical-align:middle;}
+  table.board tr:last-child td{border-bottom:none;}
+  .rank{font-weight:700; text-align:center; width:34px; color:var(--gold-light);}
+  .pname{font-weight:700; letter-spacing:.3px;}
+  .total{font-weight:800; text-align:center; color:var(--gold-light); font-size:1.05rem; width:70px;}
+  .bono{font-weight:700; text-align:center; color:#a9c1f0; font-size:.9rem; width:56px;}
+  .teamcell{display:flex; align-items:center; gap:8px;}
+  .flagimg{width:32px; height:auto; border-radius:3px; box-shadow:0 0 0 1px rgba(255,255,255,.25); display:block;}
+  .flagimg-sm{width:20px !important;}
+  .teamcell.elim{filter:grayscale(1); opacity:.5;}
+  .legend{display:flex; gap:14px; align-items:center; margin:10px 2px; font-size:.75rem; color:#c9d3e8;}
+  .legend .swatch{display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:5px; vertical-align:-2px;}
+  .swatch.active{background:#152c5c; border:1px solid var(--gold);}
+  .swatch.elim{background:var(--gray-bg); filter:grayscale(1); opacity:.6;}
+
+  table.manual-table{width:100%; border-collapse:collapse; font-size:.78rem; margin-top:8px;}
+  table.manual-table th, table.manual-table td{padding:5px 6px; border-bottom:1px solid #1c3566; text-align:left;}
+  table.manual-table select, table.manual-table input{width:100%;}
+  a.back{display:inline-block; margin-top:10px; color:#8fa0c8; font-size:.8rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="gameTitle">⭐ Quiniela</h1>
+    <p id="gameSubtitle">Cargando...</p>
+  </header>
+
+  <div class="panel">
+    <button id="refreshBtn" class="secondary">Actualizar resultados</button>
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch active"></span>Equipo activo</span>
+    <span><span class="swatch elim"></span>Equipo eliminado</span>
+  </div>
+
+  <table class="board">
+    <thead><tr><th class="rank">#</th><th>Jugador</th><th>Equipo</th><th class="bono">Bono</th><th class="total">Total</th></tr></thead>
+    <tbody id="boardBody"></tbody>
+  </table>
+
+  <details class="panel" style="margin-top:14px;">
+    <summary>🛠️ Ajustes manuales (anulan el cálculo automático)</summary>
+    <div id="manualLock" class="row">
+      <input type="password" id="manualPassword" placeholder="Contraseña de administrador">
+      <button id="manualUnlockBtn">Desbloquear</button>
+    </div>
+    <div id="manualContent" style="display:none;">
+      <p class="hint">Deja el campo de puntos vacío para usar el cálculo automático. Usa esto si un resultado no se detectó bien.</p>
+      <table class="manual-table">
+        <thead><tr><th>Equipo</th><th>Auto: puntos</th><th>Auto: bono</th><th>Auto: estado</th><th>Forzar eliminado</th><th>Forzar puntos</th></tr></thead>
+        <tbody id="manualBody"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <a class="back" href="/">← Volver a la quiniela principal</a>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const slug = params.get('slug');
+const STAGE_ORDER = ['GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
+const STAGE_LABELS = {
+  GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos', LAST_16: 'Octavos de final',
+  QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
+};
+const MANUAL_UNLOCK_STORAGE = `quiniela_game_unlocked_${slug}`;
+
+let currentGame = null;
+let currentMatches = [];
+let adminPassword = null;
+
+function showStatus(msg, isErr){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+
+function deriveWinner(score){
+  if (!score) return null;
+  if (score.winner) return score.winner;
+  for (const field of ['penalties', 'extraTime', 'regularTime', 'fullTime']){
+    const s = score[field];
+    if (s && typeof s.home === 'number' && typeof s.away === 'number' && s.home !== s.away){
+      return s.home > s.away ? 'HOME_TEAM' : 'AWAY_TEAM';
+    }
+  }
+  return null;
+}
+
+function computeTeamStats(matches, teamId, startStage){
+  const startIdx = STAGE_ORDER.indexOf(startStage);
+  const reachedStage = new Set();
+  let rawPoints = 0;
+  let eliminated = false;
+
+  for (const m of matches){
+    const stageIdx = STAGE_ORDER.indexOf(m.stage);
+    if (stageIdx <= startIdx) continue;
+    for (const side of [m.homeTeam, m.awayTeam]){
+      if (side && side.id === teamId) reachedStage.add(m.stage);
+    }
+  }
+
+  for (const m of matches){
+    if (m.status !== 'FINISHED') continue;
+    const stageIdx = STAGE_ORDER.indexOf(m.stage);
+    if (stageIdx < startIdx) continue;
+    const isHome = m.homeTeam && m.homeTeam.id === teamId;
+    const isAway = m.awayTeam && m.awayTeam.id === teamId;
+    if (!isHome && !isAway) continue;
+
+    const winner = deriveWinner(m.score);
+    const won = (isHome && winner==='HOME_TEAM') || (isAway && winner==='AWAY_TEAM');
+    const lost = (isHome && winner==='AWAY_TEAM') || (isAway && winner==='HOME_TEAM');
+    const isGroup = m.stage === 'GROUP_STAGE';
+    const extra = m.score && m.score.duration && m.score.duration !== 'REGULAR';
+
+    if (isGroup){
+      if (won) rawPoints += 3;
+      else if (winner === 'DRAW') rawPoints += 1;
+    } else {
+      if (won) rawPoints += extra ? 2 : 3;
+      else if (lost) rawPoints += extra ? 1 : 0;
+      if (lost) eliminated = true;
+    }
+
+    if (won && stageIdx + 1 < STAGE_ORDER.length){
+      reachedStage.add(STAGE_ORDER[stageIdx + 1]);
+    }
+  }
+
+  const bonus = [...reachedStage].filter(s => STAGE_ORDER.indexOf(s) > startIdx).length;
+  return { rawPoints, bonus, eliminated };
+}
+
+function effectiveStats(auto, override){
+  const ov = override || {};
+  const rawPoints = (ov.points !== undefined && ov.points !== null && ov.points !== '') ? Number(ov.points) : auto.rawPoints;
+  let eliminated = auto.eliminated;
+  if (ov.elim === 'yes') eliminated = true;
+  if (ov.elim === 'no') eliminated = false;
+  return { rawPoints, bonus: auto.bonus, points: rawPoints + auto.bonus, eliminated };
+}
+
+function render(){
+  const game = currentGame;
+  const matches = currentMatches;
+  const overrides = game.overrides || {};
+
+  const rows = game.players.map(p => {
+    const auto = computeTeamStats(matches, p.teamId, game.stage);
+    const eff = effectiveStats(auto, overrides[String(p.teamId)]);
+    return { ...p, ...eff };
+  }).sort((a,b) => b.points - a.points);
+
+  const body = document.getElementById('boardBody');
+  body.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td class="pname">${r.name}</td>
+      <td>
+        <div class="teamcell ${r.eliminated ? 'elim' : ''}">
+          ${r.teamCrest ? `<img class="flagimg" src="${r.teamCrest}" alt="${r.teamName}">` : ''}
+          <span>${r.teamName} <span style="color:#a9c1f0;">(${r.rawPoints} pts)</span></span>
+        </div>
+      </td>
+      <td class="bono">${r.bonus}</td>
+      <td class="total">${r.points}</td>
+    </tr>
+  `).join('');
+
+  const manualBody = document.getElementById('manualBody');
+  manualBody.innerHTML = game.players.map(p => {
+    const auto = computeTeamStats(matches, p.teamId, game.stage);
+    const ov = overrides[String(p.teamId)] || {};
+    return `<tr>
+      <td style="display:flex;align-items:center;gap:6px;">
+        ${p.teamCrest ? `<img class="flagimg flagimg-sm" src="${p.teamCrest}" alt="">` : ''} ${p.teamName}
+      </td>
+      <td>${auto.rawPoints}</td>
+      <td>${auto.bonus}</td>
+      <td>${auto.eliminated ? 'Eliminado' : 'Activo'}</td>
+      <td>
+        <select data-team="${p.teamId}" data-field="elim" class="ovInput">
+          <option value="auto" ${!ov.elim || ov.elim==='auto' ? 'selected':''}>Auto</option>
+          <option value="yes" ${ov.elim==='yes' ? 'selected':''}>Eliminado</option>
+          <option value="no" ${ov.elim==='no' ? 'selected':''}>Activo</option>
+        </select>
+      </td>
+      <td><input type="number" class="ovInput" data-team="${p.teamId}" data-field="points" value="${ov.points ?? ''}" placeholder="auto"></td>
+    </tr>`;
+  }).join('');
+
+  manualBody.querySelectorAll('.ovInput').forEach(el => {
+    el.addEventListener('change', async () => {
+      const teamId = el.dataset.team;
+      const field = el.dataset.field;
+      const row = el.closest('tr');
+      const pointsInput = row.querySelector('[data-field=points]');
+      const elimSelect = row.querySelector('[data-field=elim]');
+      await submitOverride(teamId, pointsInput.value, elimSelect.value);
+    });
+  });
+}
+
+async function submitOverride(teamId, points, eliminated){
+  try {
+    const res = await fetch('/.netlify/functions/games-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, adminPassword, teamId: Number(teamId), points, eliminated }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al guardar el ajuste');
+    currentGame.overrides = data.overrides;
+    render();
+  } catch (err) {
+    showStatus(err.message, true);
+  }
+}
+
+async function loadGame(){
+  showStatus('Actualizando resultados...', false);
+  try {
+    const res = await fetch(`/.netlify/functions/games-get?slug=${encodeURIComponent(slug)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo cargar la quiniela');
+    currentGame = data.game;
+    currentMatches = data.matches;
+    document.getElementById('gameTitle').textContent = `⭐ ${currentGame.gameName}`;
+    document.getElementById('gameSubtitle').textContent =
+      `Desde ${STAGE_LABELS[currentGame.stage] || currentGame.stage} — puntos calculados según resultados reales`;
+    render();
+    if (data.matchesError){
+      showStatus(`Resultados no actualizados (${data.matchesError}). Mostrando el último estado guardado.`, true);
+    } else {
+      showStatus('Actualizado: ' + new Date().toLocaleString('es-MX'), false);
+    }
+  } catch (err) {
+    showStatus(err.message, true);
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadGame);
+
+document.getElementById('manualUnlockBtn').addEventListener('click', () => {
+  const val = document.getElementById('manualPassword').value;
+  adminPassword = val;
+  sessionStorage.setItem(MANUAL_UNLOCK_STORAGE, val);
+  document.getElementById('manualLock').style.display = 'none';
+  document.getElementById('manualContent').style.display = 'block';
+  document.getElementById('manualPassword').value = '';
+});
+
+(function init(){
+  if (!slug){
+    showStatus('Falta el identificador de la quiniela en la URL.', true);
+    return;
+  }
+  const stored = sessionStorage.getItem(MANUAL_UNLOCK_STORAGE);
+  if (stored){
+    adminPassword = stored;
+    document.getElementById('manualLock').style.display = 'none';
+    document.getElementById('manualContent').style.display = 'block';
+  }
+  loadGame();
+})();
+</script>
+</body>
+</html>
