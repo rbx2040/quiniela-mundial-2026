@@ -81,6 +81,7 @@
   <div class="panel">
     <button id="refreshBtn" class="secondary">Actualizar resultados</button>
     <div class="status" id="statusMsg"></div>
+    <div id="linkFallback" style="display:none;"></div>
   </div>
 
   <div class="legend">
@@ -283,12 +284,29 @@ async function submitOverride(teamId, points, eliminated){
   }
 }
 
+function sleep(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+async function fetchGameOnce(){
+  const res = await fetch(`/.netlify/functions/games-get?slug=${encodeURIComponent(slug)}`);
+  const data = await res.json();
+  return { res, data };
+}
+
 async function loadGame(){
   showStatus('Actualizando resultados...', false);
   try {
-    const res = await fetch(`/.netlify/functions/games-get?slug=${encodeURIComponent(slug)}`);
-    const data = await res.json();
+    // A game fetched moments after creation can briefly 404 while the write
+    // propagates, so retry a couple of times before treating it as missing.
+    const delays = [0, 800, 1600];
+    let res, data;
+    for (let i = 0; i < delays.length; i++){
+      if (delays[i]) await sleep(delays[i]);
+      ({ res, data } = await fetchGameOnce());
+      if (res.status !== 404) break;
+    }
+
     if (!res.ok) throw new Error(data.error || 'No se pudo cargar la quiniela');
+    document.getElementById('linkFallback').style.display = 'none';
     currentGame = data.game;
     currentMatches = data.matches;
     document.getElementById('gameTitle').textContent = `⭐ ${currentGame.gameName}`;
@@ -302,7 +320,28 @@ async function loadGame(){
     }
   } catch (err) {
     showStatus(err.message, true);
+    showLinkFallback();
   }
+}
+
+function showLinkFallback(){
+  const url = window.location.href;
+  const el = document.getElementById('linkFallback');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <p class="hint">Si acabas de crear esta quiniela, esto puede tardar unos segundos — presiona "Actualizar resultados" para reintentar.</p>
+    <p class="hint">Enlace de esta quiniela:</p>
+    <div class="row">
+      <input type="text" readonly value="${url}" style="flex:1; min-width:0;">
+      <button id="copyLinkBtn" class="secondary">📋 Copiar</button>
+    </div>
+  `;
+  document.getElementById('copyLinkBtn').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(url); } catch {}
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
+  });
 }
 
 document.getElementById('refreshBtn').addEventListener('click', loadGame);
