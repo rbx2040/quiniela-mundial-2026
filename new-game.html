@@ -151,6 +151,12 @@ form.addEventListener('submit', async (e) => {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
+    if (res.status === 409 && data.suggestedStage){
+      document.getElementById('stage').value = data.suggestedStage;
+      showStatus(`${data.error} Ya ajusté la etapa abajo — presiona "Crear quiniela" de nuevo para confirmar.`, true);
+      submitBtn.disabled = false;
+      return;
+    }
     if (!res.ok) throw new Error(data.error || 'Error al crear la quiniela');
     window.location.href = `/g/${data.slug}`;
   } catch (err) {

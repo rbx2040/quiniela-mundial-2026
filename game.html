@@ -221,7 +221,7 @@ function render(){
   body.innerHTML = rows.map((r, i) => `
     <tr>
       <td class="rank">${i+1}</td>
-      <td class="pname">${r.name}</td>
+      <td class="pname">${r.name ? r.name : '<span style="color:#8fa0c8; font-style:italic; font-weight:400;">Sin Asignar</span>'}</td>
       <td>
         <div class="teamcell ${r.eliminated ? 'elim' : ''}">
           ${r.teamCrest ? `<img class="flagimg" src="${r.teamCrest}" alt="${r.teamName}">` : ''}

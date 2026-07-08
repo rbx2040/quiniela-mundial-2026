@@ -37,7 +37,9 @@ export default async (req) => {
       tournament: g.tournament,
       stage: g.stage,
       createdAt: g.createdAt,
-      playerCount: g.players?.length || 0,
+      assignedCount: (g.players || []).filter((p) => p.name).length,
+      totalSlots: g.players?.length || 0,
+      playerNames: (g.players || []).filter((p) => p.name).map((p) => p.name),
     }))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
