@@ -1,5 +1,5 @@
 import { fetchMatches, findAvailableStage, STAGE_ORDER } from './lib/football-data.js';
-import { buildAssignment } from './lib/assignment.js';
+import { buildMixedAssignment } from './lib/assignment.js';
 import { generateUniqueSlug, saveGame } from './lib/games-store.js';
 
 const VALID_TOURNAMENTS = ['WC2026'];
@@ -80,7 +80,7 @@ export default async (req) => {
     });
   }
 
-  const assignedPlayers = buildAssignment(pool, cleanPlayers);
+  const assignedPlayers = buildMixedAssignment(pool, cleanPlayers);
 
   const slug = await generateUniqueSlug(gameName);
   const game = {

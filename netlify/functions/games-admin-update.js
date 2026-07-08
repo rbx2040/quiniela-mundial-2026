@@ -1,5 +1,5 @@
 import { fetchMatches, findAvailableStage, STAGE_ORDER } from './lib/football-data.js';
-import { buildAssignment } from './lib/assignment.js';
+import { buildMixedAssignment } from './lib/assignment.js';
 import { loadGame, saveGame } from './lib/games-store.js';
 
 const VALID_TOURNAMENTS = ['WC2026'];
@@ -61,11 +61,23 @@ export default async (req) => {
   if (!Array.isArray(players) || players.length < 2) {
     return jsonResponse(400, { error: 'Se necesitan al menos 2 jugadores' });
   }
-  const cleanPlayers = players.map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
-  if (cleanPlayers.length !== players.length) {
-    return jsonResponse(400, { error: 'Todos los jugadores necesitan un nombre' });
+  // Each entry is either a plain name (auto-assigned) or { name, teamId }
+  // (manually pinned to a specific team).
+  const normalizedPlayers = [];
+  for (const p of players) {
+    let name, teamId;
+    if (typeof p === 'string') {
+      name = p.trim();
+    } else if (p && typeof p === 'object') {
+      name = typeof p.name === 'string' ? p.name.trim() : '';
+      teamId = p.teamId === undefined || p.teamId === null || p.teamId === '' ? null : Number(p.teamId);
+    } else {
+      return jsonResponse(400, { error: 'Formato de jugador inválido' });
+    }
+    if (!name) return jsonResponse(400, { error: 'Todos los jugadores necesitan un nombre' });
+    normalizedPlayers.push(teamId ? { name, teamId } : name);
   }
-  if (cleanPlayers.length > 48) {
+  if (normalizedPlayers.length > 48) {
     return jsonResponse(400, { error: 'Demasiados jugadores' });
   }
 
@@ -88,13 +100,18 @@ export default async (req) => {
   }
 
   const pool = resolved.pool;
-  if (cleanPlayers.length > pool.length) {
+  if (normalizedPlayers.length > pool.length) {
     return jsonResponse(400, {
-      error: `Solo hay ${pool.length} equipos disponibles en esa etapa para ${cleanPlayers.length} jugadores`,
+      error: `Solo hay ${pool.length} equipos disponibles en esa etapa para ${normalizedPlayers.length} jugadores`,
     });
   }
 
-  const assignedPlayers = buildAssignment(pool, cleanPlayers);
+  let assignedPlayers;
+  try {
+    assignedPlayers = buildMixedAssignment(pool, normalizedPlayers);
+  } catch (err) {
+    return jsonResponse(400, { error: err.message });
+  }
 
   const updatedGame = {
     ...existing,

@@ -39,7 +39,12 @@ export default async (req) => {
       createdAt: g.createdAt,
       assignedCount: (g.players || []).filter((p) => p.name).length,
       totalSlots: g.players?.length || 0,
-      playerNames: (g.players || []).filter((p) => p.name).map((p) => p.name),
+      players: (g.players || []).map((p) => ({
+        name: p.name,
+        teamId: p.teamId,
+        teamName: p.teamName,
+        teamCrest: p.teamCrest,
+      })),
     }))
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
