@@ -112,8 +112,16 @@
 </div>
 
 <script>
-const params = new URLSearchParams(window.location.search);
-const slug = params.get('slug');
+function getSlugFromUrl(){
+  // Netlify's redirect rewrites /g/:slug -> /game.html?slug=:slug server-side,
+  // but that rewrite is invisible to client JS: the browser's address bar (and
+  // window.location) keeps showing the original /g/:slug path, never the
+  // rewritten query string. So the slug has to be read from the path itself.
+  const pathMatch = window.location.pathname.match(/^\/g\/([^/]+)\/?$/);
+  if (pathMatch) return decodeURIComponent(pathMatch[1]);
+  return new URLSearchParams(window.location.search).get('slug');
+}
+const slug = getSlugFromUrl();
 const STAGE_ORDER = ['GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
 const STAGE_LABELS = {
   GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos', LAST_16: 'Octavos de final',
