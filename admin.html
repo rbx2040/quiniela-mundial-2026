@@ -156,6 +156,7 @@ function renderGames(games){
           <div class="row" style="margin-top:10px;">
             <button class="small" data-save="${idx}">Guardar cambios</button>
             <button class="small secondary" data-cancel="${idx}">Cancelar</button>
+            <button type="button" class="small danger" data-delete="${idx}" style="margin-left:auto;">🗑️ Eliminar quiniela</button>
           </div>
           <div class="status" id="editStatus-${idx}"></div>
         </div>
@@ -174,6 +175,33 @@ function renderGames(games){
   document.querySelectorAll('button[data-save]').forEach(btn => {
     btn.addEventListener('click', () => saveGame(Number(btn.dataset.save)));
   });
+  document.querySelectorAll('button[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => deleteGameConfirm(Number(btn.dataset.delete)));
+  });
+}
+
+async function deleteGameConfirm(idx){
+  const g = lastGames[idx];
+  const ok = window.confirm(`¿Eliminar "${g.gameName}" permanentemente? Esto no se puede deshacer.`);
+  if (!ok) return;
+
+  const statusEl = document.getElementById(`editStatus-${idx}`);
+  statusEl.textContent = 'Eliminando...';
+  statusEl.className = 'status';
+
+  try {
+    const res = await fetch('/.netlify/functions/games-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: g.slug, sitePassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+    await loadGames(sitePassword);
+  } catch (err) {
+    statusEl.textContent = err.message;
+    statusEl.className = 'status err';
+  }
 }
 
 async function fetchPool(idx, stage){

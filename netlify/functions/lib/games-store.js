@@ -61,6 +61,11 @@ export async function loadGame(slug) {
   return strongGet(slug);
 }
 
+export async function deleteGame(slug) {
+  const store = getGamesStore();
+  await store.delete(slug);
+}
+
 export async function listGames() {
   const store = getGamesStore();
   const { blobs } = await store.list();
