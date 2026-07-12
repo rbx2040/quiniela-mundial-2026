@@ -24,6 +24,21 @@ export async function fetchMatches(tournament) {
 
 export const STAGE_ORDER = ['GROUP_STAGE', 'LAST_32', 'LAST_16', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'];
 
+const PENDING_MATCH_STATUSES = new Set(['SCHEDULED', 'TIMED', 'IN_PLAY', 'PAUSED', 'SUSPENDED', 'POSTPONED', 'CANCELLED', 'AWARDED']);
+
+// football-data.org's status field has been observed getting corrupted into a
+// raw date string on individual matches instead of "FINISHED", even though
+// the match has a complete final score. Trust any status we don't recognize
+// as still-pending when the score is actually complete, rather than treating
+// an already-decided match as still open and letting an eliminated team back
+// into the pool.
+function isMatchDecided(m) {
+  if (PENDING_MATCH_STATUSES.has(m.status)) return false;
+  if (m.status === 'FINISHED') return true;
+  const ft = m.score && m.score.fullTime;
+  return Boolean(ft && ft.home !== null && ft.home !== undefined && ft.away !== null && ft.away !== undefined);
+}
+
 // Only teams whose fixture at this stage hasn't been decided yet are eligible
 // for a fresh assignment: this guarantees no already-eliminated team can be
 // handed out, and no points can ever be retroactive to a match that already
@@ -32,7 +47,7 @@ export function teamsAtStage(matches, stage) {
   const seen = new Map();
   for (const m of matches) {
     if (m.stage !== stage) continue;
-    if (m.status === 'FINISHED') continue;
+    if (isMatchDecided(m)) continue;
     for (const side of [m.homeTeam, m.awayTeam]) {
       if (!side || !side.id || !side.name) continue;
       seen.set(side.id, { id: side.id, name: side.name, crest: side.crest || null });

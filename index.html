@@ -344,6 +344,20 @@ function deriveWinner(score){
   return null;
 }
 
+const PENDING_MATCH_STATUSES = new Set(['SCHEDULED','TIMED','IN_PLAY','PAUSED','SUSPENDED','POSTPONED','CANCELLED','AWARDED']);
+
+// football-data.org's status field has been observed getting corrupted into a
+// raw date string on individual matches instead of "FINISHED", even though
+// the match has a complete final score. Trust any status we don't recognize
+// as still-pending when the score is actually complete, rather than silently
+// dropping that match (and wrongly leaving an eliminated team looking active).
+function isMatchDecided(m){
+  if (PENDING_MATCH_STATUSES.has(m.status)) return false;
+  if (m.status === 'FINISHED') return true;
+  const ft = m.score && m.score.fullTime;
+  return !!(ft && ft.home !== null && ft.home !== undefined && ft.away !== null && ft.away !== undefined);
+}
+
 function computeAutoStats(matches){
   const stats = {};
   for (const code in TEAMS) stats[code] = { rawPoints:0, bonus:0, played:0, eliminated:false, reachedKnockout:false, reachedQuarters:false };
@@ -400,7 +414,7 @@ function computeAutoStats(matches){
   }
 
   for (const m of matches){
-    if (m.status !== 'FINISHED') continue;
+    if (!isMatchDecided(m)) continue;
     const homeCode = nameToCode[normalize(m.homeTeam && m.homeTeam.name)];
     const awayCode = nameToCode[normalize(m.awayTeam && m.awayTeam.name)];
     const winner = deriveWinner(m.score);
