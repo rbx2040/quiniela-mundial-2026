@@ -65,17 +65,26 @@
       <label for="tournament">Torneo</label>
       <select id="tournament">
         <option value="WC2026">Mundial 2026</option>
+        <option value="PL">Premier League</option>
       </select>
 
-      <label for="stage">Etapa en la que empieza</label>
-      <select id="stage">
-        <option value="GROUP_STAGE">Fase de grupos</option>
-        <option value="LAST_32">Dieciseisavos (1/16)</option>
-        <option value="LAST_16">Octavos de final (1/8)</option>
-        <option value="QUARTER_FINALS" selected>Cuartos de final</option>
-        <option value="SEMI_FINALS">Semifinales</option>
-        <option value="FINAL">Final</option>
-      </select>
+      <div id="stageKnockoutWrap">
+        <label for="stageKnockout">Etapa en la que empieza</label>
+        <select id="stageKnockout">
+          <option value="GROUP_STAGE">Fase de grupos</option>
+          <option value="LAST_32">Dieciseisavos (1/16)</option>
+          <option value="LAST_16">Octavos de final (1/8)</option>
+          <option value="QUARTER_FINALS" selected>Cuartos de final</option>
+          <option value="SEMI_FINALS">Semifinales</option>
+          <option value="FINAL">Final</option>
+        </select>
+      </div>
+
+      <div id="stageLeagueWrap" style="display:none;">
+        <label for="stageLeague">Jornada en la que empieza</label>
+        <input type="number" id="stageLeague" min="1" max="38" value="1">
+        <p class="hint">Si esa jornada ya está en curso, ajustaremos automáticamente a la próxima disponible.</p>
+      </div>
 
       <label for="playerCount">Número de jugadores</label>
       <input type="number" id="playerCount" min="2" max="48" value="4">
@@ -96,6 +105,42 @@
 </div>
 
 <script>
+const TOURNAMENTS = {
+  WC2026: { type: 'KNOCKOUT' },
+  PL: { type: 'LEAGUE' },
+};
+
+const tournamentSelect = document.getElementById('tournament');
+const stageKnockoutWrap = document.getElementById('stageKnockoutWrap');
+const stageLeagueWrap = document.getElementById('stageLeagueWrap');
+
+function currentTournamentType(){
+  return (TOURNAMENTS[tournamentSelect.value] || {}).type;
+}
+
+function updateStageFieldVisibility(){
+  const isLeague = currentTournamentType() === 'LEAGUE';
+  stageKnockoutWrap.style.display = isLeague ? 'none' : 'block';
+  stageLeagueWrap.style.display = isLeague ? 'block' : 'none';
+}
+
+function getStageValue(){
+  return currentTournamentType() === 'LEAGUE'
+    ? document.getElementById('stageLeague').value
+    : document.getElementById('stageKnockout').value;
+}
+
+function setStageValue(value){
+  if (currentTournamentType() === 'LEAGUE'){
+    document.getElementById('stageLeague').value = value;
+  } else {
+    document.getElementById('stageKnockout').value = value;
+  }
+}
+
+tournamentSelect.addEventListener('change', updateStageFieldVisibility);
+updateStageFieldVisibility();
+
 const playerCountInput = document.getElementById('playerCount');
 const playerInputsDiv = document.getElementById('playerInputs');
 
@@ -136,8 +181,8 @@ form.addEventListener('submit', async (e) => {
   const payload = {
     gameName: document.getElementById('gameName').value.trim(),
     creatorName: document.getElementById('creatorName').value.trim(),
-    tournament: document.getElementById('tournament').value,
-    stage: document.getElementById('stage').value,
+    tournament: tournamentSelect.value,
+    stage: getStageValue(),
     players,
     adminPassword: document.getElementById('adminPassword').value,
   };
@@ -152,7 +197,7 @@ form.addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (res.status === 409 && data.suggestedStage){
-      document.getElementById('stage').value = data.suggestedStage;
+      setStageValue(data.suggestedStage);
       showStatus(`${data.error} Ya ajusté la etapa abajo — presiona "Crear quiniela" de nuevo para confirmar.`, true);
       submitBtn.disabled = false;
       return;

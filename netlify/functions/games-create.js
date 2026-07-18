@@ -1,12 +1,15 @@
-import { fetchMatches, findAvailableStage, STAGE_ORDER } from './lib/football-data.js';
+import { fetchMatches, findAvailablePeriod, TOURNAMENTS } from './lib/football-data.js';
 import { buildMixedAssignment } from './lib/assignment.js';
 import { generateUniqueSlug, saveGame } from './lib/games-store.js';
 
-const VALID_TOURNAMENTS = ['WC2026'];
 const STAGE_LABELS = {
   GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos (1/16)', LAST_16: 'Octavos de final (1/8)',
   QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
 };
+
+function periodLabel(tournamentType, period) {
+  return tournamentType === 'LEAGUE' ? `Jornada ${period}` : (STAGE_LABELS[period] || period);
+}
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -35,11 +38,15 @@ export default async (req) => {
   if (typeof creatorName !== 'string' || !creatorName.trim()) {
     return jsonResponse(400, { error: 'Falta tu nombre (el de quien crea la quiniela)' });
   }
-  if (!VALID_TOURNAMENTS.includes(tournament)) {
+  const tournamentConfig = TOURNAMENTS[tournament];
+  if (!tournamentConfig) {
     return jsonResponse(400, { error: 'Torneo inválido' });
   }
-  if (!STAGE_ORDER.includes(stage)) {
+  if (stage === undefined || stage === null || stage === '') {
     return jsonResponse(400, { error: 'Etapa inválida' });
+  }
+  if (tournamentConfig.type === 'LEAGUE' && (!Number.isInteger(Number(stage)) || Number(stage) < 1)) {
+    return jsonResponse(400, { error: 'La jornada debe ser un número' });
   }
   if (typeof adminPassword !== 'string' || adminPassword.length < 4) {
     return jsonResponse(400, { error: 'La contraseña de administrador debe tener al menos 4 caracteres' });
@@ -62,14 +69,14 @@ export default async (req) => {
     return jsonResponse(502, { error: `No se pudo consultar football-data.org: ${err.message}` });
   }
 
-  const resolved = findAvailableStage(matches, stage);
+  const resolved = findAvailablePeriod(matches, tournamentConfig.type, stage);
   if (!resolved) {
     return jsonResponse(400, { error: 'Ese torneo todavía no tiene equipos disponibles para ninguna etapa.' });
   }
-  if (resolved.stage !== stage) {
+  if (resolved.period !== stage && String(resolved.period) !== String(stage)) {
     return jsonResponse(409, {
-      error: `${STAGE_LABELS[stage]} ya concluyó. La próxima etapa disponible es ${STAGE_LABELS[resolved.stage]}.`,
-      suggestedStage: resolved.stage,
+      error: `${periodLabel(tournamentConfig.type, stage)} ya concluyó. La próxima etapa disponible es ${periodLabel(tournamentConfig.type, resolved.period)}.`,
+      suggestedStage: resolved.period,
     });
   }
 
@@ -88,7 +95,7 @@ export default async (req) => {
     gameName: gameName.trim(),
     creatorName: creatorName.trim(),
     tournament,
-    stage,
+    stage: resolved.period,
     createdAt: new Date().toISOString(),
     adminPassword,
     players: assignedPlayers,

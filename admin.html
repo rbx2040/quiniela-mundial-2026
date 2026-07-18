@@ -94,9 +94,22 @@ const STAGE_LABELS = {
   QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
 };
 const STAGE_OPTIONS = ['GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
+const TOURNAMENTS = {
+  WC2026: { type: 'KNOCKOUT' },
+  PL: { type: 'LEAGUE' },
+};
 let sitePassword = null;
 let lastGames = [];
 const poolCache = {}; // idx -> pool array for the currently loaded stage in that edit panel
+
+function tournamentTypeFor(idx){
+  const g = lastGames[idx];
+  return (TOURNAMENTS[g.tournament] || {}).type;
+}
+
+function periodLabel(tournamentType, period){
+  return tournamentType === 'LEAGUE' ? `Jornada ${period}` : (STAGE_LABELS[period] || period);
+}
 
 function showStatus(msg, isErr){
   const el = document.getElementById('statusMsg');
@@ -106,6 +119,20 @@ function showStatus(msg, isErr){
 
 function stageOptionsHtml(selected){
   return STAGE_OPTIONS.map(s => `<option value="${s}" ${s===selected?'selected':''}>${STAGE_LABELS[s]}</option>`).join('');
+}
+
+function getStageValue(idx){
+  return tournamentTypeFor(idx) === 'LEAGUE'
+    ? document.getElementById(`editStageLeague-${idx}`).value
+    : document.getElementById(`editStageKnockout-${idx}`).value;
+}
+
+function setStageValue(idx, value){
+  if (tournamentTypeFor(idx) === 'LEAGUE'){
+    document.getElementById(`editStageLeague-${idx}`).value = value;
+  } else {
+    document.getElementById(`editStageKnockout-${idx}`).value = value;
+  }
 }
 
 function teamOptionsHtml(pool, selectedTeamId){
@@ -126,7 +153,10 @@ function playerRowHtml(idx, rowIdx, name, teamId, pool){
 
 function renderGames(games){
   lastGames = games;
-  document.getElementById('gamesList').innerHTML = games.map((g, idx) => `
+  document.getElementById('gamesList').innerHTML = games.map((g, idx) => {
+    const type = (TOURNAMENTS[g.tournament] || {}).type;
+    const isLeague = type === 'LEAGUE';
+    return `
     <div class="game-card">
       <div class="top">
         <div class="name"><a href="/g/${g.slug}" target="_blank">${g.gameName}</a></div>
@@ -135,7 +165,7 @@ function renderGames(games){
       <dl>
         <dt>Creador</dt><dd>${g.creatorName}</dd>
         <dt>Torneo</dt><dd>${g.tournament}</dd>
-        <dt>Etapa</dt><dd>${STAGE_LABELS[g.stage] || g.stage}</dd>
+        <dt>Etapa</dt><dd>${periodLabel(type, g.stage)}</dd>
         <dt>Jugadores</dt><dd>${g.assignedCount} / ${g.totalSlots}</dd>
         <dt>Creado</dt><dd>${new Date(g.createdAt).toLocaleString('es-MX')}</dd>
       </dl>
@@ -145,8 +175,14 @@ function renderGames(games){
           <input type="text" id="editGameName-${idx}">
           <label>Nombre del creador</label>
           <input type="text" id="editCreatorName-${idx}">
-          <label>Etapa</label>
-          <select id="editStage-${idx}">${stageOptionsHtml(g.stage)}</select>
+          <div id="editStageKnockoutWrap-${idx}" style="display:${isLeague ? 'none' : 'block'};">
+            <label>Etapa</label>
+            <select id="editStageKnockout-${idx}">${stageOptionsHtml(g.stage)}</select>
+          </div>
+          <div id="editStageLeagueWrap-${idx}" style="display:${isLeague ? 'block' : 'none'};">
+            <label>Jornada</label>
+            <input type="number" id="editStageLeague-${idx}" min="1" max="38" value="${isLeague ? g.stage : 1}">
+          </div>
           <label>Jugadores y equipos</label>
           <div id="playerRows-${idx}"></div>
           <div class="row" style="margin-top:8px;">
@@ -162,7 +198,8 @@ function renderGames(games){
         </div>
       </div>
     </div>
-  `).join('') || '<p>No hay quinielas creadas todavía.</p>';
+  `;
+  }).join('') || '<p>No hay quinielas creadas todavía.</p>';
 
   document.querySelectorAll('button[data-idx]').forEach(btn => {
     btn.addEventListener('click', () => openEditPanel(Number(btn.dataset.idx)));
@@ -216,9 +253,9 @@ async function fetchPool(idx, stage){
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'No se pudieron cargar los equipos disponibles');
     poolCache[idx] = data.pool;
-    if (data.resolvedStage !== stage){
-      document.getElementById(`editStage-${idx}`).value = data.resolvedStage;
-      statusEl.textContent = `Esa etapa ya concluyó, se ajustó a ${STAGE_LABELS[data.resolvedStage]}.`;
+    if (String(data.resolvedStage) !== String(stage)){
+      setStageValue(idx, data.resolvedStage);
+      statusEl.textContent = `Esa etapa ya concluyó, se ajustó a ${periodLabel(tournamentTypeFor(idx), data.resolvedStage)}.`;
       statusEl.className = 'status err';
     }
   } catch (err) {
@@ -253,22 +290,24 @@ async function openEditPanel(idx){
 
   document.getElementById(`editGameName-${idx}`).value = g.gameName;
   document.getElementById(`editCreatorName-${idx}`).value = g.creatorName;
-  const stageSelect = document.getElementById(`editStage-${idx}`);
-  stageSelect.value = g.stage;
+  setStageValue(idx, g.stage);
+  const stageField = tournamentTypeFor(idx) === 'LEAGUE'
+    ? document.getElementById(`editStageLeague-${idx}`)
+    : document.getElementById(`editStageKnockout-${idx}`);
 
   const statusEl = document.getElementById(`editStatus-${idx}`);
   statusEl.textContent = 'Cargando equipos disponibles...';
   statusEl.className = 'status';
-  await fetchPool(idx, stageSelect.value);
+  await fetchPool(idx, getStageValue(idx));
   statusEl.textContent = '';
 
   const namedPlayers = g.players.filter(p => p.name).map(p => ({ name: p.name, teamId: p.teamId }));
   renderPlayerRows(idx, namedPlayers.length ? namedPlayers : [{ name: '', teamId: null }]);
 
-  stageSelect.onchange = async () => {
+  stageField.onchange = async () => {
     statusEl.textContent = 'Cargando equipos disponibles...';
     statusEl.className = 'status';
-    await fetchPool(idx, stageSelect.value);
+    await fetchPool(idx, getStageValue(idx));
     statusEl.textContent = 'Etapa cambiada: revisa los equipos asignados abajo.';
     // Re-render existing rows against the new pool; team IDs that no longer
     // exist in this stage's pool will just fall back to "Auto".
@@ -312,7 +351,7 @@ async function saveGame(idx){
     gameName: document.getElementById(`editGameName-${idx}`).value.trim(),
     creatorName: document.getElementById(`editCreatorName-${idx}`).value.trim(),
     tournament: g.tournament,
-    stage: document.getElementById(`editStage-${idx}`).value,
+    stage: getStageValue(idx),
     players,
   };
 
@@ -324,7 +363,7 @@ async function saveGame(idx){
     });
     const data = await res.json();
     if (res.status === 409 && data.suggestedStage){
-      document.getElementById(`editStage-${idx}`).value = data.suggestedStage;
+      setStageValue(idx, data.suggestedStage);
       statusEl.textContent = `${data.error} Ya ajusté la etapa — presiona "Guardar cambios" de nuevo.`;
       statusEl.className = 'status err';
       return;

@@ -84,7 +84,7 @@
     <div id="linkFallback" style="display:none;"></div>
   </div>
 
-  <div class="legend">
+  <div class="legend" id="legend">
     <span><span class="swatch active"></span>Equipo activo</span>
     <span><span class="swatch elim"></span>Equipo eliminado</span>
   </div>
@@ -128,6 +128,13 @@ const STAGE_LABELS = {
   GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos', LAST_16: 'Octavos de final',
   QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
 };
+const TOURNAMENTS = {
+  WC2026: { type: 'KNOCKOUT', label: 'Mundial 2026' },
+  PL: { type: 'LEAGUE', label: 'Premier League' },
+};
+function periodLabel(tournamentType, period){
+  return tournamentType === 'LEAGUE' ? `Jornada ${period}` : (STAGE_LABELS[period] || period);
+}
 const MANUAL_UNLOCK_STORAGE = `quiniela_game_unlocked_${slug}`;
 
 let currentGame = null;
@@ -166,7 +173,32 @@ function isMatchDecided(m){
   return !!(ft && ft.home !== null && ft.home !== undefined && ft.away !== null && ft.away !== undefined);
 }
 
-function computeTeamStats(matches, teamId, startStage){
+function computeLeagueTeamStats(matches, teamId, startMatchday){
+  // A league has no bracket, no elimination: just 3/1/0 all season from the
+  // starting matchday onward, so a game's total literally mirrors the
+  // team's real league points earned since the game began.
+  let rawPoints = 0;
+  for (const m of matches){
+    if (!isMatchDecided(m)) continue;
+    if (typeof m.matchday !== 'number' || m.matchday < startMatchday) continue;
+    const isHome = m.homeTeam && m.homeTeam.id === teamId;
+    const isAway = m.awayTeam && m.awayTeam.id === teamId;
+    if (!isHome && !isAway) continue;
+
+    const winner = deriveWinner(m.score);
+    const won = (isHome && winner==='HOME_TEAM') || (isAway && winner==='AWAY_TEAM');
+    if (won) rawPoints += 3;
+    else if (winner === 'DRAW') rawPoints += 1;
+  }
+  return { rawPoints, bonus: 0, eliminated: false };
+}
+
+function computeTeamStats(matches, teamId, startPeriod, tournamentType){
+  if (tournamentType === 'LEAGUE'){
+    return computeLeagueTeamStats(matches, teamId, Number(startPeriod));
+  }
+
+  const startStage = startPeriod;
   const startIdx = STAGE_ORDER.indexOf(startStage);
   const reachedStage = new Set();
   let rawPoints = 0;
@@ -227,7 +259,7 @@ function render(){
   const overrides = game.overrides || {};
 
   const rows = game.players.map(p => {
-    const auto = computeTeamStats(matches, p.teamId, game.stage);
+    const auto = computeTeamStats(matches, p.teamId, game.stage, (TOURNAMENTS[game.tournament] || {}).type);
     const eff = effectiveStats(auto, overrides[String(p.teamId)]);
     return { ...p, ...eff };
   }).sort((a,b) => b.points - a.points);
@@ -250,7 +282,7 @@ function render(){
 
   const manualBody = document.getElementById('manualBody');
   manualBody.innerHTML = game.players.map(p => {
-    const auto = computeTeamStats(matches, p.teamId, game.stage);
+    const auto = computeTeamStats(matches, p.teamId, game.stage, (TOURNAMENTS[game.tournament] || {}).type);
     const ov = overrides[String(p.teamId)] || {};
     return `<tr>
       <td style="display:flex;align-items:center;gap:6px;">
@@ -323,9 +355,11 @@ async function loadGame(){
     document.getElementById('linkFallback').style.display = 'none';
     currentGame = data.game;
     currentMatches = data.matches;
+    const tournamentType = (TOURNAMENTS[currentGame.tournament] || {}).type;
     document.getElementById('gameTitle').textContent = `⭐ ${currentGame.gameName}`;
     document.getElementById('gameSubtitle').textContent =
-      `Desde ${STAGE_LABELS[currentGame.stage] || currentGame.stage} — puntos calculados según resultados reales`;
+      `Desde ${periodLabel(tournamentType, currentGame.stage)} — puntos calculados según resultados reales`;
+    document.getElementById('legend').style.display = tournamentType === 'LEAGUE' ? 'none' : 'flex';
     render();
     if (data.matchesError){
       showStatus(`Resultados no actualizados (${data.matchesError}). Mostrando el último estado guardado.`, true);

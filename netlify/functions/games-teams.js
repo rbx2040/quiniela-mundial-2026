@@ -1,6 +1,4 @@
-import { fetchMatches, findAvailableStage, STAGE_ORDER } from './lib/football-data.js';
-
-const VALID_TOURNAMENTS = ['WC2026'];
+import { fetchMatches, findAvailablePeriod, TOURNAMENTS } from './lib/football-data.js';
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -22,10 +20,11 @@ export default async (req) => {
   }
 
   const { tournament, stage } = body || {};
-  if (!VALID_TOURNAMENTS.includes(tournament)) {
+  const tournamentConfig = TOURNAMENTS[tournament];
+  if (!tournamentConfig) {
     return jsonResponse(400, { error: 'Torneo inválido' });
   }
-  if (!STAGE_ORDER.includes(stage)) {
+  if (stage === undefined || stage === null || stage === '') {
     return jsonResponse(400, { error: 'Etapa inválida' });
   }
 
@@ -36,14 +35,14 @@ export default async (req) => {
     return jsonResponse(502, { error: `No se pudo consultar football-data.org: ${err.message}` });
   }
 
-  const resolved = findAvailableStage(matches, stage);
+  const resolved = findAvailablePeriod(matches, tournamentConfig.type, stage);
   if (!resolved) {
     return jsonResponse(400, { error: 'Ese torneo todavía no tiene equipos disponibles para ninguna etapa.' });
   }
 
   return jsonResponse(200, {
     requestedStage: stage,
-    resolvedStage: resolved.stage,
+    resolvedStage: resolved.period,
     pool: resolved.pool,
   });
 };
