@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiniela de Predicciones</title>
+<style>
+  :root{
+    --navy:#0a1a3a; --navy-2:#132a5c; --gold:#d4af37; --gold-light:#f3d97a;
+  }
+  *{box-sizing:border-box;}
+  html, body{overflow-x:hidden;}
+  body{
+    margin:0; font-family:'Segoe UI',Arial,sans-serif;
+    background:linear-gradient(160deg,var(--navy) 0%,#04102a 100%);
+    color:#fff; min-height:100vh; padding:16px;
+  }
+  .wrap{max-width:900px; margin:0 auto;}
+  header{
+    text-align:center; padding:18px 10px; border:2px solid var(--gold);
+    border-radius:14px; background:linear-gradient(180deg,#0d234f,#081a3d);
+    margin-bottom:16px; box-shadow:0 0 20px rgba(212,175,55,.25);
+  }
+  header h1{margin:0 0 4px; color:var(--gold-light); font-size:1.4rem;}
+  header p{margin:0; color:#c9d3e8; font-size:.8rem; line-height:1.4;}
+
+  .panel{
+    background:#0d234f; border:1px solid #24407a; border-radius:10px;
+    padding:12px 14px; margin-bottom:14px; font-size:.85rem;
+  }
+  .panel summary{cursor:pointer; color:var(--gold-light); font-weight:600; outline:none;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;}
+  .row:first-child{margin-top:0;}
+  input[type=text], input[type=password], input[type=number]{
+    background:#0a1a3a; border:1px solid #345; color:#fff; border-radius:6px;
+    padding:6px 8px; font-size:.85rem;
+  }
+  input[type=number]{width:56px; text-align:center;}
+  button{
+    background:var(--gold); color:#1a1a1a; border:none; border-radius:6px;
+    padding:7px 14px; font-weight:600; cursor:pointer; font-size:.85rem;
+  }
+  button:hover{background:var(--gold-light);}
+  button.secondary{background:#24407a; color:#fff;}
+  .status{margin-top:8px; font-size:.8rem; color:#9fd3a3;}
+  .status.err{color:#ff9b9b;}
+  .hint{color:#8fa0c8; font-size:.75rem; margin-top:6px; line-height:1.4;}
+  a.hint{color:#8fa0c8; text-decoration:underline;}
+
+  table.board{width:100%; border-collapse:collapse; background:#0d234f; border-radius:10px; overflow:hidden;}
+  table.board th{
+    background:var(--gold); color:#111; padding:10px 8px; font-size:.78rem; text-transform:uppercase;
+  }
+  table.board td{padding:10px 8px; border-bottom:1px solid #1c3566; vertical-align:middle;}
+  table.board tr:last-child td{border-bottom:none;}
+  table.board tr.me{background:#152c5c;}
+  .rank{font-weight:700; text-align:center; width:34px; color:var(--gold-light);}
+  .pname{font-weight:700; letter-spacing:.3px;}
+  .total{font-weight:800; text-align:center; color:var(--gold-light); font-size:1.05rem; width:70px;}
+  .bono{font-weight:700; text-align:center; color:#a9c1f0; font-size:.9rem; width:76px;}
+
+  .match-row{
+    border:1px solid #24407a; border-radius:8px; padding:10px 12px; margin-bottom:8px;
+    display:flex; flex-direction:column; gap:6px; background:#0a1a3a;
+  }
+  .match-row .teams{font-size:.85rem; font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .match-row .kickoff{color:#8fa0c8; font-weight:400; font-size:.75rem;}
+  .pick-inputs{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .chip-toggle{display:flex; align-items:center; gap:4px; font-size:.78rem; color:var(--gold-light); cursor:pointer;}
+  .chip-toggle input{cursor:pointer;}
+  .chip-toggle input:disabled + span, .chip-toggle input:disabled{opacity:.4; cursor:default;}
+  .pick-summary{font-size:.8rem; color:#c9d3e8;}
+  .match-row.locked{opacity:.75;}
+  .match-row.decided.tier-correct{border-color:#3f9d5c;}
+  .match-row.decided.tier-close{border-color:var(--gold);}
+  .match-row.decided.tier-wrong, .match-row.decided.tier-none{opacity:.7;}
+
+  a.back{display:inline-block; margin-top:10px; color:#8fa0c8; font-size:.8rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="gameTitle">⭐ Quiniela</h1>
+    <p id="gameSubtitle">Cargando...</p>
+  </header>
+
+  <div class="panel">
+    <button id="refreshBtn" class="secondary">Actualizar</button>
+    <div class="status" id="statusMsg"></div>
+    <div id="linkFallback" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="joinPanel">
+    <label for="playerNameInput" style="display:block; margin-bottom:6px; color:var(--gold-light); font-weight:600;">¿Quién eres?</label>
+    <div class="row">
+      <input type="text" id="playerNameInput" placeholder="Tu nombre" maxlength="40">
+      <button id="joinBtn">Continuar</button>
+    </div>
+    <p class="hint">Escribe tu nombre para empezar a predecir. Si ya habías entrado con ese nombre, retomamos tus predicciones.</p>
+  </div>
+
+  <div id="playerPanel" style="display:none;">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;">
+        <span>Jugando como <strong id="currentPlayerName"></strong> — <a href="#" id="switchPlayerLink" class="hint">cambiar</a></span>
+        <span class="hint" id="chipCounter"></span>
+      </div>
+    </div>
+
+    <div class="panel" id="activeMatchesPanel">
+      <h3 id="activeMatchesTitle" style="margin:0 0 10px; color:var(--gold-light); font-size:.95rem;">Partidos abiertos</h3>
+      <div id="activeMatchesList"></div>
+      <button id="savePicksBtn" style="margin-top:6px;">Guardar mis predicciones</button>
+      <div class="status" id="pickStatusMsg"></div>
+    </div>
+
+    <details class="panel" id="historyPanel">
+      <summary>📜 Resultados y puntos anteriores</summary>
+      <div id="historyList" style="margin-top:10px;"></div>
+    </details>
+  </div>
+
+  <table class="board">
+    <thead><tr><th class="rank">#</th><th>Jugador</th><th class="total">Puntos</th><th class="bono">Chips</th></tr></thead>
+    <tbody id="leaderboardBody"></tbody>
+  </table>
+
+  <a class="back" href="/">← Volver a la quiniela principal</a>
+</div>
+
+<script>
+function getSlugFromUrl(){
+  const pathMatch = window.location.pathname.match(/^\/g\/([^/]+)\/?$/);
+  if (pathMatch) return decodeURIComponent(pathMatch[1]);
+  return new URLSearchParams(window.location.search).get('slug');
+}
+const slug = getSlugFromUrl();
+
+const TOURNAMENTS = {
+  WC2026: { type: 'KNOCKOUT', label: 'Mundial 2026' },
+  PL: { type: 'LEAGUE', label: 'Premier League' },
+};
+const KNOCKOUT_STAGE_ORDER = ['GROUP_STAGE','LAST_32','LAST_16','QUARTER_FINALS','SEMI_FINALS','FINAL'];
+const STAGE_LABELS = {
+  GROUP_STAGE: 'Fase de grupos', LAST_32: 'Dieciseisavos', LAST_16: 'Octavos de final',
+  QUARTER_FINALS: 'Cuartos de final', SEMI_FINALS: 'Semifinales', FINAL: 'Final',
+};
+function periodLabel(tournamentType, period){
+  return tournamentType === 'LEAGUE' ? `Jornada ${period}` : (STAGE_LABELS[period] || period);
+}
+function periodOf(m, tournamentType){
+  return tournamentType === 'LEAGUE' ? m.matchday : m.stage;
+}
+function orderedPeriods(matches, tournamentType){
+  if (tournamentType === 'KNOCKOUT'){
+    const present = new Set(matches.map(m => m.stage));
+    return KNOCKOUT_STAGE_ORDER.filter(s => present.has(s));
+  }
+  const days = new Set();
+  for (const m of matches) if (typeof m.matchday === 'number') days.add(m.matchday);
+  return [...days].sort((a,b) => a - b);
+}
+
+const MAX_CHIPS = 2;
+const PENDING_MATCH_STATUSES = new Set(['SCHEDULED','TIMED','IN_PLAY','PAUSED','SUSPENDED','POSTPONED','CANCELLED','AWARDED']);
+
+// See football-data.js for why this trusts a complete score over an
+// unrecognized status string instead of treating a decided match as pending.
+function isMatchDecided(m){
+  if (PENDING_MATCH_STATUSES.has(m.status)) return false;
+  if (m.status === 'FINISHED') return true;
+  const ft = m.score && m.score.fullTime;
+  return !!(ft && ft.home !== null && ft.home !== undefined && ft.away !== null && ft.away !== undefined);
+}
+function isMatchOpen(m, now){
+  if (!m.utcDate) return false;
+  return new Date(m.utcDate).getTime() > (now || new Date()).getTime();
+}
+function actualScore(m){
+  const ft = m.score && m.score.fullTime;
+  if (!ft || ft.home === null || ft.home === undefined || ft.away === null || ft.away === undefined) return null;
+  return { home: ft.home, away: ft.away };
+}
+function outcomeOf(home, away){
+  if (home > away) return 'HOME';
+  if (away > home) return 'AWAY';
+  return 'DRAW';
+}
+function hasPick(pred){
+  return !!pred && Number.isInteger(pred.home) && Number.isInteger(pred.away) && pred.home >= 0 && pred.away >= 0;
+}
+function scorePrediction(pred, match){
+  if (!hasPick(pred)) return { points: 0, tier: 'none', exact: false };
+  if (!isMatchDecided(match)) return { points: 0, tier: 'pending', exact: false };
+  const actual = actualScore(match);
+  if (!actual) return { points: 0, tier: 'pending', exact: false };
+  const predOutcome = outcomeOf(pred.home, pred.away);
+  const actualOutcome = outcomeOf(actual.home, actual.away);
+  const exact = pred.home === actual.home && pred.away === actual.away;
+  let points = 0, tier = 'wrong';
+  if (predOutcome === actualOutcome){ points = 3; tier = 'correct'; }
+  else if (Math.abs(pred.home - actual.home) <= 1 || Math.abs(pred.away - actual.away) <= 1){ points = 1; tier = 'close'; }
+  if (pred.chip && exact) points += 1;
+  return { points, tier, exact };
+}
+function scorePlayerPredictions(picks, matches){
+  const byId = new Map(matches.map(m => [String(m.id), m]));
+  let total = 0, chipsUsed = 0;
+  const perMatch = {};
+  for (const [matchId, pred] of Object.entries(picks || {})){
+    if (pred && pred.chip) chipsUsed++;
+    const match = byId.get(String(matchId));
+    if (!match) continue;
+    const result = scorePrediction(pred, match);
+    perMatch[matchId] = result;
+    total += result.points;
+  }
+  return { total, chipsUsed, perMatch };
+}
+
+const NAME_STORAGE_KEY = `quiniela_predictions_name_${slug}`;
+
+let currentGame = null;
+let currentMatches = [];
+let currentPlayerName = null;
+
+function showStatus(msg, isErr){
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+function showPickStatus(msg, isErr){
+  const el = document.getElementById('pickStatusMsg');
+  el.textContent = msg;
+  el.className = 'status' + (isErr ? ' err' : '');
+}
+
+function sleep(ms){ return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+async function fetchGameOnce(){
+  const res = await fetch(`/.netlify/functions/games-get?slug=${encodeURIComponent(slug)}`);
+  const data = await res.json();
+  return { res, data };
+}
+
+async function loadGame(){
+  showStatus('Actualizando...', false);
+  try {
+    const delays = [0, 800, 1600];
+    let res, data;
+    for (let i = 0; i < delays.length; i++){
+      if (delays[i]) await sleep(delays[i]);
+      ({ res, data } = await fetchGameOnce());
+      if (res.status !== 404) break;
+    }
+    if (!res.ok) throw new Error(data.error || 'No se pudo cargar la quiniela');
+    document.getElementById('linkFallback').style.display = 'none';
+    currentGame = data.game;
+    currentMatches = data.matches || [];
+    const label = (TOURNAMENTS[currentGame.tournament] || {}).label || currentGame.tournament;
+    document.getElementById('gameTitle').textContent = `⭐ ${currentGame.gameName}`;
+    document.getElementById('gameSubtitle').textContent =
+      `${label} — 3 pts por acertar el resultado, 1 pt si quedas cerca, +1 con el chip si aciertas el marcador exacto (2 chips por temporada)`;
+    renderAll();
+    if (data.matchesError){
+      showStatus(`Resultados no actualizados (${data.matchesError}). Mostrando el último estado guardado.`, true);
+    } else {
+      showStatus('Actualizado: ' + new Date().toLocaleString('es-MX'), false);
+    }
+  } catch (err) {
+    showStatus(err.message, true);
+    showLinkFallback();
+  }
+}
+
+function showLinkFallback(){
+  const url = window.location.href;
+  const el = document.getElementById('linkFallback');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <p class="hint">Si acabas de crear esta quiniela, esto puede tardar unos segundos — presiona "Actualizar" para reintentar.</p>
+    <p class="hint">Enlace de esta quiniela:</p>
+    <div class="row">
+      <input type="text" readonly value="${url}" style="flex:1; min-width:0;">
+      <button id="copyLinkBtn" class="secondary">📋 Copiar</button>
+    </div>
+  `;
+  document.getElementById('copyLinkBtn').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(url); } catch {}
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = '📋 Copiar'; }, 2000);
+  });
+}
+
+function findActivePeriod(matches, tournamentType){
+  const periods = orderedPeriods(matches, tournamentType);
+  for (const p of periods){
+    const inPeriod = matches.filter(m => periodOf(m, tournamentType) === p);
+    if (inPeriod.some(m => !isMatchDecided(m))) return p;
+  }
+  return null;
+}
+
+function formatKickoff(utcDate){
+  if (!utcDate) return '';
+  try {
+    return new Date(utcDate).toLocaleString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function matchRowHtml(m, pick){
+  const open = isMatchOpen(m);
+  const decided = isMatchDecided(m);
+  const home = (m.homeTeam && m.homeTeam.name) || 'Local';
+  const away = (m.awayTeam && m.awayTeam.name) || 'Visitante';
+
+  if (decided){
+    const result = scorePrediction(pick, m);
+    const actual = actualScore(m);
+    const tierLabel = { correct: '✅ Acertaste', close: '🤏 Cerca', wrong: '❌ Fallaste', none: '⬜ Sin predicción' }[result.tier] || '';
+    return `
+      <div class="match-row decided tier-${result.tier}">
+        <div class="teams">${home} ${actual.home}-${actual.away} ${away}</div>
+        <div class="pick-summary">
+          ${pick ? `Tu predicción: ${pick.home}-${pick.away}${pick.chip ? ' 🃏' : ''}` : 'No enviaste predicción'}
+          — <strong>${result.points} pts</strong> ${tierLabel}
+        </div>
+      </div>`;
+  }
+
+  if (!open){
+    return `
+      <div class="match-row locked">
+        <div class="teams">${home} vs ${away} <span class="kickoff">🔒 en curso / por confirmarse</span></div>
+        <div class="pick-summary">${pick ? `Tu predicción: ${pick.home}-${pick.away}${pick.chip ? ' 🃏' : ''}` : 'No enviaste predicción a tiempo'}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="match-row open" data-match-id="${m.id}">
+      <div class="teams">${home} vs ${away} <span class="kickoff">${formatKickoff(m.utcDate)}</span></div>
+      <div class="pick-inputs">
+        <input type="number" min="0" max="20" class="pick-home" value="${pick ? pick.home : ''}" placeholder="0">
+        <span>-</span>
+        <input type="number" min="0" max="20" class="pick-away" value="${pick ? pick.away : ''}" placeholder="0">
+        <label class="chip-toggle"><input type="checkbox" class="pick-chip" ${pick && pick.chip ? 'checked' : ''}><span>🃏 Chip</span></label>
+      </div>
+    </div>`;
+}
+
+function renderAll(){
+  renderPlayerSection();
+  renderLeaderboard();
+}
+
+function renderPlayerSection(){
+  if (!currentPlayerName){
+    document.getElementById('joinPanel').style.display = 'block';
+    document.getElementById('playerPanel').style.display = 'none';
+    return;
+  }
+  document.getElementById('joinPanel').style.display = 'none';
+  document.getElementById('playerPanel').style.display = 'block';
+  document.getElementById('currentPlayerName').textContent = currentPlayerName;
+
+  const tType = (TOURNAMENTS[currentGame.tournament] || {}).type;
+  const myPicks = (currentGame.predictions && currentGame.predictions[currentPlayerName]) || {};
+  const { chipsUsed } = scorePlayerPredictions(myPicks, currentMatches);
+  document.getElementById('chipCounter').textContent = `🃏 Chips usados: ${chipsUsed} / ${MAX_CHIPS}`;
+
+  const periods = orderedPeriods(currentMatches, tType);
+  const activePeriod = findActivePeriod(currentMatches, tType);
+  const activeIdx = activePeriod === null ? periods.length : periods.indexOf(activePeriod);
+
+  const activeMatches = activePeriod === null ? [] :
+    currentMatches.filter(m => periodOf(m, tType) === activePeriod)
+      .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+  const historyMatches = currentMatches
+    .filter(m => {
+      const idx = periods.indexOf(periodOf(m, tType));
+      return idx !== -1 && idx < activeIdx;
+    })
+    .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate));
+
+  document.getElementById('activeMatchesTitle').textContent = activePeriod === null
+    ? 'No hay partidos pendientes'
+    : `Partidos abiertos — ${periodLabel(tType, activePeriod)}`;
+
+  document.getElementById('activeMatchesList').innerHTML = activeMatches.length
+    ? activeMatches.map(m => matchRowHtml(m, myPicks[String(m.id)])).join('')
+    : '<p class="hint">No hay partidos pendientes en este momento.</p>';
+
+  document.getElementById('savePicksBtn').style.display =
+    activeMatches.some(m => isMatchOpen(m)) ? 'inline-block' : 'none';
+
+  document.getElementById('historyList').innerHTML = historyMatches.length
+    ? historyMatches.map(m => matchRowHtml(m, myPicks[String(m.id)])).join('')
+    : '<p class="hint">Todavía no hay resultados.</p>';
+
+  wireChipCheckboxes();
+}
+
+function wireChipCheckboxes(){
+  const boxes = [...document.querySelectorAll('#activeMatchesList .pick-chip')];
+  function refresh(){
+    const used = boxes.filter(b => b.checked).length;
+    boxes.forEach(b => { b.disabled = !b.checked && used >= MAX_CHIPS; });
+  }
+  boxes.forEach(b => b.addEventListener('change', refresh));
+  refresh();
+}
+
+function renderLeaderboard(){
+  const names = Object.keys((currentGame && currentGame.predictions) || {});
+  const rows = names.map(name => {
+    const picks = currentGame.predictions[name] || {};
+    const { total, chipsUsed } = scorePlayerPredictions(picks, currentMatches);
+    return { name, total, chipsUsed };
+  }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+  document.getElementById('leaderboardBody').innerHTML = rows.length ? rows.map((r, i) => `
+    <tr class="${r.name === currentPlayerName ? 'me' : ''}">
+      <td class="rank">${i + 1}</td>
+      <td class="pname">${r.name}</td>
+      <td class="total">${r.total}</td>
+      <td class="bono">${r.chipsUsed}/${MAX_CHIPS}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4" class="hint">Todavía nadie ha entrado.</td></tr>';
+}
+
+async function savePicks(){
+  const rows = [...document.querySelectorAll('#activeMatchesList .match-row.open')];
+  const picks = {};
+  for (const row of rows){
+    const matchId = row.dataset.matchId;
+    const homeVal = row.querySelector('.pick-home').value;
+    const awayVal = row.querySelector('.pick-away').value;
+    if (homeVal === '' || awayVal === '') continue;
+    const home = Number(homeVal), away = Number(awayVal);
+    if (!Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0) continue;
+    const chip = row.querySelector('.pick-chip').checked;
+    picks[matchId] = { home, away, chip };
+  }
+
+  showPickStatus('Guardando...', false);
+  try {
+    const res = await fetch('/.netlify/functions/games-predictions-submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, playerName: currentPlayerName, picks }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al guardar tus predicciones');
+    currentGame.predictions = { ...(currentGame.predictions || {}), [currentPlayerName]: data.picks };
+    showPickStatus('Predicciones guardadas.', false);
+    renderAll();
+  } catch (err) {
+    showPickStatus(err.message, true);
+  }
+}
+
+function joinAs(name){
+  currentPlayerName = name;
+  localStorage.setItem(NAME_STORAGE_KEY, name);
+  renderAll();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadGame);
+document.getElementById('joinBtn').addEventListener('click', () => {
+  const name = document.getElementById('playerNameInput').value.trim();
+  if (!name) return;
+  joinAs(name);
+});
+document.getElementById('playerNameInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('joinBtn').click();
+});
+document.getElementById('switchPlayerLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  currentPlayerName = null;
+  localStorage.removeItem(NAME_STORAGE_KEY);
+  document.getElementById('playerNameInput').value = '';
+  renderPlayerSection();
+});
+document.getElementById('savePicksBtn').addEventListener('click', savePicks);
+
+(function init(){
+  if (!slug){
+    showStatus('Falta el identificador de la quiniela en la URL.', true);
+    return;
+  }
+  const stored = localStorage.getItem(NAME_STORAGE_KEY);
+  if (stored) currentPlayerName = stored;
+  loadGame();
+})();
+</script>
+</body>
+</html>

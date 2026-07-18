@@ -35,7 +35,7 @@ export default async (req) => {
     return jsonResponse(400, { error: 'JSON inválido' });
   }
 
-  const { slug, sitePassword, gameName, creatorName, tournament, stage, players } = body || {};
+  const { slug, sitePassword, gameName, creatorName, tournament, stage, players, keepPlayers } = body || {};
 
   if (sitePassword !== configuredPassword) {
     return jsonResponse(401, { error: 'Contraseña de administrador del sitio incorrecta' });
@@ -55,6 +55,23 @@ export default async (req) => {
   if (typeof creatorName !== 'string' || !creatorName.trim()) {
     return jsonResponse(400, { error: 'Falta el nombre del creador' });
   }
+
+  if ((existing.mode || 'TEAM_POOL') === 'MATCH_PREDICTIONS') {
+    let predictions = existing.predictions || {};
+    if (Array.isArray(keepPlayers)) {
+      const keepSet = new Set(keepPlayers);
+      predictions = Object.fromEntries(Object.entries(predictions).filter(([name]) => keepSet.has(name)));
+    }
+    const updatedGame = {
+      ...existing,
+      gameName: gameName.trim(),
+      creatorName: creatorName.trim(),
+      predictions,
+    };
+    await saveGame(slug, updatedGame);
+    return jsonResponse(200, { slug });
+  }
+
   const tournamentConfig = TOURNAMENTS[tournament];
   if (!tournamentConfig) {
     return jsonResponse(400, { error: 'Torneo inválido' });

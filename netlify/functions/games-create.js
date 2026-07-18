@@ -30,7 +30,8 @@ export default async (req) => {
     return jsonResponse(400, { error: 'JSON inválido' });
   }
 
-  const { gameName, creatorName, tournament, stage, players, adminPassword } = body || {};
+  const { gameName, creatorName, tournament, mode, stage, players, adminPassword } = body || {};
+  const gameMode = mode === 'MATCH_PREDICTIONS' ? 'MATCH_PREDICTIONS' : 'TEAM_POOL';
 
   if (typeof gameName !== 'string' || !gameName.trim()) {
     return jsonResponse(400, { error: 'Falta el nombre de la quiniela' });
@@ -42,14 +43,31 @@ export default async (req) => {
   if (!tournamentConfig) {
     return jsonResponse(400, { error: 'Torneo inválido' });
   }
+  if (typeof adminPassword !== 'string' || adminPassword.length < 4) {
+    return jsonResponse(400, { error: 'La contraseña de administrador debe tener al menos 4 caracteres' });
+  }
+
+  if (gameMode === 'MATCH_PREDICTIONS') {
+    const slug = await generateUniqueSlug(gameName);
+    const game = {
+      slug,
+      gameName: gameName.trim(),
+      creatorName: creatorName.trim(),
+      tournament,
+      mode: 'MATCH_PREDICTIONS',
+      createdAt: new Date().toISOString(),
+      adminPassword,
+      predictions: {},
+    };
+    await saveGame(slug, game);
+    return jsonResponse(200, { slug });
+  }
+
   if (stage === undefined || stage === null || stage === '') {
     return jsonResponse(400, { error: 'Etapa inválida' });
   }
   if (tournamentConfig.type === 'LEAGUE' && (!Number.isInteger(Number(stage)) || Number(stage) < 1)) {
     return jsonResponse(400, { error: 'La jornada debe ser un número' });
-  }
-  if (typeof adminPassword !== 'string' || adminPassword.length < 4) {
-    return jsonResponse(400, { error: 'La contraseña de administrador debe tener al menos 4 caracteres' });
   }
   if (!Array.isArray(players) || players.length < 2) {
     return jsonResponse(400, { error: 'Se necesitan al menos 2 jugadores' });
@@ -95,6 +113,7 @@ export default async (req) => {
     gameName: gameName.trim(),
     creatorName: creatorName.trim(),
     tournament,
+    mode: 'TEAM_POOL',
     stage: resolved.period,
     createdAt: new Date().toISOString(),
     adminPassword,

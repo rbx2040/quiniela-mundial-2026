@@ -355,6 +355,10 @@ async function loadGame(){
     document.getElementById('linkFallback').style.display = 'none';
     currentGame = data.game;
     currentMatches = data.matches;
+    if (currentGame.mode === 'MATCH_PREDICTIONS'){
+      window.location.replace(`/predictions.html?slug=${encodeURIComponent(slug)}`);
+      return;
+    }
     const tournamentType = (TOURNAMENTS[currentGame.tournament] || {}).type;
     document.getElementById('gameTitle').textContent = `⭐ ${currentGame.gameName}`;
     document.getElementById('gameSubtitle').textContent =

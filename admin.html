@@ -107,6 +107,20 @@ function tournamentTypeFor(idx){
   return (TOURNAMENTS[g.tournament] || {}).type;
 }
 
+function isPredictionsMode(idx){
+  return (lastGames[idx].mode || 'TEAM_POOL') === 'MATCH_PREDICTIONS';
+}
+
+function predictionPlayerRowHtml(name){
+  return `
+    <div class="player-row" data-name="${name}">
+      <label style="display:flex; align-items:center; gap:6px; flex:1;">
+        <input type="checkbox" class="keepPlayerCheckbox" checked> ${name}
+      </label>
+    </div>
+  `;
+}
+
 function periodLabel(tournamentType, period){
   return tournamentType === 'LEAGUE' ? `Jornada ${period}` : (STAGE_LABELS[period] || period);
 }
@@ -156,6 +170,7 @@ function renderGames(games){
   document.getElementById('gamesList').innerHTML = games.map((g, idx) => {
     const type = (TOURNAMENTS[g.tournament] || {}).type;
     const isLeague = type === 'LEAGUE';
+    const predictions = (g.mode || 'TEAM_POOL') === 'MATCH_PREDICTIONS';
     return `
     <div class="game-card">
       <div class="top">
@@ -165,8 +180,9 @@ function renderGames(games){
       <dl>
         <dt>Creador</dt><dd>${g.creatorName}</dd>
         <dt>Torneo</dt><dd>${g.tournament}</dd>
-        <dt>Etapa</dt><dd>${periodLabel(type, g.stage)}</dd>
-        <dt>Jugadores</dt><dd>${g.assignedCount} / ${g.totalSlots}</dd>
+        <dt>Modo</dt><dd>${predictions ? 'Predicciones' : 'Team Pool'}</dd>
+        ${predictions ? '' : `<dt>Etapa</dt><dd>${periodLabel(type, g.stage)}</dd>`}
+        <dt>Jugadores</dt><dd>${predictions ? `${g.assignedCount} unidos` : `${g.assignedCount} / ${g.totalSlots}`}</dd>
         <dt>Creado</dt><dd>${new Date(g.createdAt).toLocaleString('es-MX')}</dd>
       </dl>
       <div id="editRow-${idx}" style="display:none;">
@@ -175,6 +191,11 @@ function renderGames(games){
           <input type="text" id="editGameName-${idx}">
           <label>Nombre del creador</label>
           <input type="text" id="editCreatorName-${idx}">
+          ${predictions ? `
+          <label>Jugadores que se han unido</label>
+          <div id="predictionPlayerRows-${idx}"></div>
+          <p class="hint">Desmarca a alguien y guarda para eliminar sus predicciones y sacarlo de la quiniela.</p>
+          ` : `
           <div id="editStageKnockoutWrap-${idx}" style="display:${isLeague ? 'none' : 'block'};">
             <label>Etapa</label>
             <select id="editStageKnockout-${idx}">${stageOptionsHtml(g.stage)}</select>
@@ -189,6 +210,7 @@ function renderGames(games){
             <button type="button" class="small secondary" data-add-row="${idx}">+ Agregar jugador</button>
           </div>
           <p class="hint">"Auto" reparte un equipo al azar entre los que queden disponibles en esa etapa. Elegir un equipo específico lo fija para ese jugador; los equipos no elegidos por nadie quedan como "Sin Asignar".</p>
+          `}
           <div class="row" style="margin-top:10px;">
             <button class="small" data-save="${idx}">Guardar cambios</button>
             <button class="small secondary" data-cancel="${idx}">Cancelar</button>
@@ -290,6 +312,15 @@ async function openEditPanel(idx){
 
   document.getElementById(`editGameName-${idx}`).value = g.gameName;
   document.getElementById(`editCreatorName-${idx}`).value = g.creatorName;
+
+  if (isPredictionsMode(idx)){
+    const container = document.getElementById(`predictionPlayerRows-${idx}`);
+    container.innerHTML = g.players.length
+      ? g.players.map(p => predictionPlayerRowHtml(p.name)).join('')
+      : '<p class="hint">Todavía nadie se ha unido.</p>';
+    return;
+  }
+
   setStageValue(idx, g.stage);
   const stageField = tournamentTypeFor(idx) === 'LEAGUE'
     ? document.getElementById(`editStageLeague-${idx}`)
@@ -332,28 +363,35 @@ async function saveGame(idx){
   statusEl.textContent = 'Guardando...';
   statusEl.className = 'status';
 
-  const players = [...document.querySelectorAll(`#playerRows-${idx} .player-row`)]
-    .map(r => ({
-      name: r.querySelector('[data-role=name]').value.trim(),
-      teamId: r.querySelector('[data-role=team]').value || null,
-    }))
-    .filter(p => p.name);
-
-  if (players.length < 2){
-    statusEl.textContent = 'Se necesitan al menos 2 jugadores con nombre.';
-    statusEl.className = 'status err';
-    return;
-  }
-
   const payload = {
     slug: g.slug,
     sitePassword,
     gameName: document.getElementById(`editGameName-${idx}`).value.trim(),
     creatorName: document.getElementById(`editCreatorName-${idx}`).value.trim(),
-    tournament: g.tournament,
-    stage: getStageValue(idx),
-    players,
   };
+
+  if (isPredictionsMode(idx)){
+    payload.keepPlayers = [...document.querySelectorAll(`#predictionPlayerRows-${idx} .player-row`)]
+      .filter(r => r.querySelector('.keepPlayerCheckbox').checked)
+      .map(r => r.dataset.name);
+  } else {
+    const players = [...document.querySelectorAll(`#playerRows-${idx} .player-row`)]
+      .map(r => ({
+        name: r.querySelector('[data-role=name]').value.trim(),
+        teamId: r.querySelector('[data-role=team]').value || null,
+      }))
+      .filter(p => p.name);
+
+    if (players.length < 2){
+      statusEl.textContent = 'Se necesitan al menos 2 jugadores con nombre.';
+      statusEl.className = 'status err';
+      return;
+    }
+
+    payload.tournament = g.tournament;
+    payload.stage = getStageValue(idx);
+    payload.players = players;
+  }
 
   try {
     const res = await fetch('/.netlify/functions/games-admin-update', {

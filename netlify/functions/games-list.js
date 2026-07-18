@@ -30,22 +30,37 @@ export default async (req) => {
 
   const games = await listGames();
   const summaries = games
-    .map((g) => ({
-      slug: g.slug,
-      gameName: g.gameName,
-      creatorName: g.creatorName || '(sin nombre)',
-      tournament: g.tournament,
-      stage: g.stage,
-      createdAt: g.createdAt,
-      assignedCount: (g.players || []).filter((p) => p.name).length,
-      totalSlots: g.players?.length || 0,
-      players: (g.players || []).map((p) => ({
-        name: p.name,
-        teamId: p.teamId,
-        teamName: p.teamName,
-        teamCrest: p.teamCrest,
-      })),
-    }))
+    .map((g) => {
+      const base = {
+        slug: g.slug,
+        gameName: g.gameName,
+        creatorName: g.creatorName || '(sin nombre)',
+        tournament: g.tournament,
+        mode: g.mode || 'TEAM_POOL',
+        createdAt: g.createdAt,
+      };
+      if (base.mode === 'MATCH_PREDICTIONS') {
+        const playerNames = Object.keys(g.predictions || {});
+        return {
+          ...base,
+          assignedCount: playerNames.length,
+          totalSlots: playerNames.length,
+          players: playerNames.map((name) => ({ name })),
+        };
+      }
+      return {
+        ...base,
+        stage: g.stage,
+        assignedCount: (g.players || []).filter((p) => p.name).length,
+        totalSlots: g.players?.length || 0,
+        players: (g.players || []).map((p) => ({
+          name: p.name,
+          teamId: p.teamId,
+          teamName: p.teamName,
+          teamCrest: p.teamCrest,
+        })),
+      };
+    })
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
   return jsonResponse(200, { games: summaries });

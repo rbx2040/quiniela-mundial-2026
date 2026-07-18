@@ -62,36 +62,48 @@
       <label for="creatorName">Tu nombre</label>
       <input type="text" id="creatorName" placeholder="¿Quién está creando esta quiniela?" required maxlength="40">
 
+      <label for="gameMode">Mecánica</label>
+      <select id="gameMode">
+        <option value="TEAM_POOL">Team Pool — cada jugador tiene un equipo</option>
+        <option value="MATCH_PREDICTIONS">Predicciones — cada quien predice los resultados</option>
+      </select>
+
       <label for="tournament">Torneo</label>
       <select id="tournament">
         <option value="WC2026">Mundial 2026</option>
         <option value="PL">Premier League</option>
       </select>
 
-      <div id="stageKnockoutWrap">
-        <label for="stageKnockout">Etapa en la que empieza</label>
-        <select id="stageKnockout">
-          <option value="GROUP_STAGE">Fase de grupos</option>
-          <option value="LAST_32">Dieciseisavos (1/16)</option>
-          <option value="LAST_16">Octavos de final (1/8)</option>
-          <option value="QUARTER_FINALS" selected>Cuartos de final</option>
-          <option value="SEMI_FINALS">Semifinales</option>
-          <option value="FINAL">Final</option>
-        </select>
+      <div id="teamPoolFields">
+        <div id="stageKnockoutWrap">
+          <label for="stageKnockout">Etapa en la que empieza</label>
+          <select id="stageKnockout">
+            <option value="GROUP_STAGE">Fase de grupos</option>
+            <option value="LAST_32">Dieciseisavos (1/16)</option>
+            <option value="LAST_16">Octavos de final (1/8)</option>
+            <option value="QUARTER_FINALS" selected>Cuartos de final</option>
+            <option value="SEMI_FINALS">Semifinales</option>
+            <option value="FINAL">Final</option>
+          </select>
+        </div>
+
+        <div id="stageLeagueWrap" style="display:none;">
+          <label for="stageLeague">Jornada en la que empieza</label>
+          <input type="number" id="stageLeague" min="1" max="38" value="1">
+          <p class="hint">Si esa jornada ya está en curso, ajustaremos automáticamente a la próxima disponible.</p>
+        </div>
+
+        <label for="playerCount">Número de jugadores</label>
+        <input type="number" id="playerCount" min="2" max="48" value="4">
+
+        <label>Nombres de los jugadores</label>
+        <div class="players" id="playerInputs"></div>
+        <p class="hint">A cada jugador se le asignará un equipo al azar entre los que sigan vivos en esa etapa.</p>
       </div>
 
-      <div id="stageLeagueWrap" style="display:none;">
-        <label for="stageLeague">Jornada en la que empieza</label>
-        <input type="number" id="stageLeague" min="1" max="38" value="1">
-        <p class="hint">Si esa jornada ya está en curso, ajustaremos automáticamente a la próxima disponible.</p>
+      <div id="predictionsFields" style="display:none;">
+        <p class="hint">No hace falta anotar jugadores ahora — comparte el enlace y cada quien entra con su nombre para hacer sus propias predicciones antes de que empiece cada partido.</p>
       </div>
-
-      <label for="playerCount">Número de jugadores</label>
-      <input type="number" id="playerCount" min="2" max="48" value="4">
-
-      <label>Nombres de los jugadores</label>
-      <div class="players" id="playerInputs"></div>
-      <p class="hint">A cada jugador se le asignará un equipo al azar entre los que sigan vivos en esa etapa.</p>
 
       <label for="adminPassword">Contraseña de administrador</label>
       <input type="password" id="adminPassword" placeholder="Para poder hacer ajustes manuales luego" required minlength="4">
@@ -113,9 +125,26 @@ const TOURNAMENTS = {
 const tournamentSelect = document.getElementById('tournament');
 const stageKnockoutWrap = document.getElementById('stageKnockoutWrap');
 const stageLeagueWrap = document.getElementById('stageLeagueWrap');
+const gameModeSelect = document.getElementById('gameMode');
+const teamPoolFields = document.getElementById('teamPoolFields');
+const predictionsFields = document.getElementById('predictionsFields');
 
 function currentTournamentType(){
   return (TOURNAMENTS[tournamentSelect.value] || {}).type;
+}
+
+function isPredictionsMode(){
+  return gameModeSelect.value === 'MATCH_PREDICTIONS';
+}
+
+function updateModeFieldVisibility(){
+  const predictions = isPredictionsMode();
+  teamPoolFields.style.display = predictions ? 'none' : 'block';
+  predictionsFields.style.display = predictions ? 'block' : 'none';
+  // A required input inside a display:none ancestor still blocks native form
+  // validation (only the element's own display:none is exempted), so the
+  // dynamically-created player-name inputs need `required` toggled off too.
+  document.querySelectorAll('#playerInputs input').forEach((el) => { el.required = !predictions; });
 }
 
 function updateStageFieldVisibility(){
@@ -140,6 +169,8 @@ function setStageValue(value){
 
 tournamentSelect.addEventListener('change', updateStageFieldVisibility);
 updateStageFieldVisibility();
+gameModeSelect.addEventListener('change', updateModeFieldVisibility);
+updateModeFieldVisibility();
 
 const playerCountInput = document.getElementById('playerCount');
 const playerInputsDiv = document.getElementById('playerInputs');
@@ -172,20 +203,24 @@ function showStatus(msg, isErr){
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const players = [...playerInputsDiv.querySelectorAll('input')].map(i => i.value.trim());
-  if (players.some(p => !p)){
-    showStatus('Todos los jugadores necesitan un nombre.', true);
-    return;
-  }
 
   const payload = {
     gameName: document.getElementById('gameName').value.trim(),
     creatorName: document.getElementById('creatorName').value.trim(),
     tournament: tournamentSelect.value,
-    stage: getStageValue(),
-    players,
+    mode: gameModeSelect.value,
     adminPassword: document.getElementById('adminPassword').value,
   };
+
+  if (!isPredictionsMode()){
+    const players = [...playerInputsDiv.querySelectorAll('input')].map(i => i.value.trim());
+    if (players.some(p => !p)){
+      showStatus('Todos los jugadores necesitan un nombre.', true);
+      return;
+    }
+    payload.stage = getStageValue();
+    payload.players = players;
+  }
 
   submitBtn.disabled = true;
   showStatus('Creando quiniela...', false);
